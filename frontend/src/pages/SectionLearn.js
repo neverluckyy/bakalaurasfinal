@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, BookOpen, CheckCircle, Play } from 'lucide-react';
+import { ArrowLeft, BookOpen, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import './SectionLearn.css';
 

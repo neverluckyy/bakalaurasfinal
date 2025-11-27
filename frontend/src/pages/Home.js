@@ -4,10 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   BookOpen, 
   Trophy, 
-  TrendingUp, 
-  Target,
-  Star,
-  Award
+  Star
 } from 'lucide-react';
 import axios from 'axios';
 import './Home.css';

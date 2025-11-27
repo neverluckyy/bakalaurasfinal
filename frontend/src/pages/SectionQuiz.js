@@ -94,7 +94,7 @@ const SectionQuiz = () => {
         if (response.data.xpEarned) {
           // Fetch updated user stats to ensure we have the latest data
           try {
-            const userStatsResponse = await axios.get('/api/user/stats');
+            await axios.get('/api/user/stats');
             const updatedUser = { 
               ...user, 
               total_xp: response.data.newTotalXP || (user.total_xp || 0) + response.data.xpEarned,
