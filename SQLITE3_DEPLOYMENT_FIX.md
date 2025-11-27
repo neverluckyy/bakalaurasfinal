@@ -23,7 +23,7 @@ This file ensures Railway (or other Nixpacks-based platforms) has the necessary 
 
 ```toml
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "python3", "make", "gcc"]
+nixPkgs = ["nodejs-22_x", "python3", "make", "gcc"]
 
 [phases.install]
 cmds = ["npm ci", "npm rebuild sqlite3 --build-from-source"]
@@ -36,7 +36,7 @@ cmd = "node server.js"
 ```
 
 This configuration:
-- Installs Node.js, Python, make, and gcc (required for building native modules)
+- Installs Node.js 22 (matching your deployment environment), Python, make, and gcc (required for building native modules)
 - Runs `npm ci` for clean install
 - Explicitly rebuilds sqlite3 from source for the target platform
 - Sets the start command
@@ -69,33 +69,41 @@ npm install better-sqlite3
 
 Then update `backend/database/init.js` to use `better-sqlite3` instead.
 
-### Option 2: Use Dockerfile
+### Option 2: Use Dockerfile (RECOMMENDED - Already Created)
 
-Create a `backend/Dockerfile`:
+A `backend/Dockerfile` has been created:
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:22-alpine
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# Install build dependencies required for sqlite3
+RUN apk add --no-cache python3 make g++ sqlite
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies and rebuild sqlite3
-RUN npm ci && npm rebuild sqlite3 --build-from-source
+# Install dependencies
+RUN npm ci
 
-# Copy application code
+# Rebuild sqlite3 from source for this platform
+RUN npm rebuild sqlite3 --build-from-source
+
+# Copy the rest of the application
 COPY . .
 
-# Expose port
+# Expose the port
 EXPOSE 5000
 
-# Start server
+# Start the server
 CMD ["node", "server.js"]
 ```
+
+**To use Dockerfile on Railway:**
+1. Railway should automatically detect the Dockerfile
+2. If not, go to Settings → Build → Select "Dockerfile" as build method
+3. Redeploy
 
 ### Option 3: Use Pure JavaScript SQLite
 
@@ -127,19 +135,27 @@ After deploying with the fix:
 
 1. **Commit the changes**:
    ```bash
-   git add backend/nixpacks.toml backend/package.json
-   git commit -m "Fix sqlite3 deployment issue with nixpacks config"
+   git add backend/nixpacks.toml backend/package.json backend/Dockerfile backend/.dockerignore
+   git commit -m "Fix sqlite3 deployment issue - add Dockerfile and update nixpacks"
    git push
    ```
 
-2. **Redeploy on Railway**:
+2. **Configure Railway to use Dockerfile** (if not auto-detected):
+   - Go to Railway dashboard → Your Project → Settings
+   - Find "Build" section
+   - Select "Dockerfile" as the build method
+   - Or Railway should auto-detect it
+
+3. **Redeploy on Railway**:
    - Railway will automatically detect the changes
    - Monitor the deployment logs
+   - Look for: `npm rebuild sqlite3 --build-from-source` running successfully
    - Verify the fix worked
 
-3. **If still failing**:
-   - Consider switching to `better-sqlite3` (Option 1 above)
-   - Or use Dockerfile approach (Option 2)
+4. **If still failing**:
+   - Check Railway logs to see if Dockerfile is being used
+   - Verify build tools are available (should be with Dockerfile)
+   - Consider switching to `better-sqlite3` (Option 1 above) as a last resort
 
 ## Additional Notes
 
