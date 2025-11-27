@@ -77,7 +77,8 @@ A `backend/Dockerfile` has been created:
 FROM node:22-alpine
 
 # Install build dependencies required for sqlite3
-RUN apk add --no-cache python3 make g++ sqlite
+# py3-setuptools provides distutils which is needed by node-gyp (removed in Python 3.12)
+RUN apk add --no-cache python3 make g++ sqlite py3-setuptools
 
 WORKDIR /app
 
@@ -99,6 +100,8 @@ EXPOSE 5000
 # Start the server
 CMD ["node", "server.js"]
 ```
+
+**Important:** The `py3-setuptools` package is required because Python 3.12 removed the `distutils` module, which `node-gyp` (used by sqlite3) still requires.
 
 **To use Dockerfile on Railway:**
 1. Railway should automatically detect the Dockerfile

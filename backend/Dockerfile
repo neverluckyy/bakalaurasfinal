@@ -1,7 +1,8 @@
 FROM node:22-alpine
 
 # Install build dependencies required for sqlite3
-RUN apk add --no-cache python3 make g++ sqlite
+# py3-setuptools provides distutils which is needed by node-gyp (removed in Python 3.12)
+RUN apk add --no-cache python3 make g++ sqlite py3-setuptools
 
 WORKDIR /app
 
