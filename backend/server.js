@@ -68,7 +68,7 @@ app.use(cors({
 // Rate limiting for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 5 : 50, // More lenient in development
+  max: process.env.NODE_ENV === 'production' ? 20 : 50, // Increased for testing (was 5)
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false
@@ -83,6 +83,11 @@ app.use(cookieParser());
 app.use('/avatars', express.static(path.join(__dirname, '../frontend/public/avatars')));
 
 // Routes
+// Test endpoint to verify routes are loading
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Routes are working!', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/questions', questionRoutes);
@@ -117,15 +122,26 @@ app.use('*', (req, res) => {
 // Initialize database and start server
 async function startServer() {
   try {
+    console.log('Starting server initialization...');
+    console.log('Loading routes...');
+    
     await initDatabase();
     console.log('Database initialized successfully');
     
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
+      console.log('Routes registered:');
+      console.log('  - /api/health');
+      console.log('  - /api/test');
+      console.log('  - /api/auth/*');
+      console.log('  - /api/modules/*');
+      console.log('  - /api/user/*');
+      console.log('  - /api/sections/*');
     });
   } catch (error) {
     console.error('Failed to start server:', error);
+    console.error('Error stack:', error.stack);
     process.exit(1);
   }
 }
