@@ -75,6 +75,7 @@ router.post('/register', async (req, res) => {
 
           res.status(201).json({
             message: 'User created successfully',
+            token: token, // Also return token in response for localStorage
             user: {
               id: userId,
               email,
@@ -123,15 +124,21 @@ router.post('/login', async (req, res) => {
         }
         
         if (!user) {
+          console.log(`Login attempt failed: User not found for email: ${email}`);
           return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        console.log(`Login attempt for user: ${user.email} (ID: ${user.id})`);
+        
         // Check password
         const isValidPassword = await bcrypt.compare(password, user.password_hash);
         
         if (!isValidPassword) {
+          console.log(`Login attempt failed: Invalid password for email: ${email}`);
           return res.status(401).json({ error: 'Invalid credentials' });
         }
+
+        console.log(`Login successful for user: ${user.email}`);
 
         // Generate JWT token
         const token = jwt.sign(
@@ -145,16 +152,27 @@ router.post('/login', async (req, res) => {
         // - secure: true (required for HTTPS)
         // - sameSite: 'none' (required for cross-site)
         const isProduction = process.env.NODE_ENV === 'production';
-        res.cookie('token', token, {
+        const cookieOptions = {
           httpOnly: true,
           secure: isProduction, // true for HTTPS in production
           sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
           path: '/' // Explicitly set path
+        };
+        
+        console.log('Setting cookie with options:', {
+          secure: cookieOptions.secure,
+          sameSite: cookieOptions.sameSite,
+          httpOnly: cookieOptions.httpOnly,
+          isProduction: isProduction,
+          origin: req.headers.origin
         });
+        
+        res.cookie('token', token, cookieOptions);
 
         res.json({
           message: 'Login successful',
+          token: token, // Also return token in response for localStorage
           user: {
             id: user.id,
             email: user.email,

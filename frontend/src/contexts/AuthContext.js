@@ -16,10 +16,20 @@ export function AuthProvider({ children }) {
   }, []);
 
   const checkAuth = async () => {
+    // Check if we have a token in localStorage
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.get('/api/auth/me', { withCredentials: true });
+      const response = await axios.get('/api/auth/me');
       setUser(response.data.user);
     } catch (error) {
+      // Token might be invalid, clear it
+      localStorage.removeItem('authToken');
       setUser(null);
     } finally {
       setLoading(false);
@@ -32,6 +42,12 @@ export function AuthProvider({ children }) {
         { email, password }, 
         { withCredentials: true }
       );
+      
+      // Store token in localStorage if provided
+      if (response.data.token) {
+        localStorage.setItem('authToken', response.data.token);
+      }
+      
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
@@ -48,6 +64,12 @@ export function AuthProvider({ children }) {
         { email, password, display_name, avatar_key }, 
         { withCredentials: true }
       );
+      
+      // Store token in localStorage if provided
+      if (response.data.token) {
+        localStorage.setItem('authToken', response.data.token);
+      }
+      
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
@@ -64,6 +86,8 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear token from localStorage
+      localStorage.removeItem('authToken');
       setUser(null);
     }
   };

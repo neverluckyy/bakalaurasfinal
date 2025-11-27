@@ -2,7 +2,17 @@ const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 
 const authenticateToken = (req, res, next) => {
-  const token = req.cookies.token;
+  // Try to get token from Authorization header first (for localStorage)
+  const authHeader = req.headers.authorization;
+  const tokenFromHeader = authHeader && authHeader.startsWith('Bearer ') 
+    ? authHeader.substring(7) 
+    : null;
+  
+  // Fall back to cookie if no header token
+  const tokenFromCookie = req.cookies.token;
+  
+  // Use header token if available, otherwise use cookie
+  const token = tokenFromHeader || tokenFromCookie;
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
