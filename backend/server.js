@@ -26,10 +26,37 @@ app.use(helmet());
 app.set('trust proxy', 1);
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : process.env.NODE_ENV === 'production' 
     ? ['https://sensebait.pro', 'https://www.sensebait.pro'] 
-    : ['http://localhost:3000'],
+    : ['http://localhost:3000'];
+
+// Add Netlify domains pattern if in production
+if (process.env.NODE_ENV === 'production') {
+  // Allow all Netlify subdomains
+  allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
+}
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin === allowed;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    })) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
@@ -59,25 +86,6 @@ app.use('/api/user', userRoutes);
 app.use('/api/sections', sectionRoutes);
 app.use('/api/learning-content', learningContentRoutes);
 app.use('/api/admin', adminRoutes);
-
-// Root endpoint - API information
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Social Engineering Learning API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth',
-      modules: '/api/modules',
-      questions: '/api/questions',
-      leaderboard: '/api/leaderboard',
-      user: '/api/user',
-      sections: '/api/sections',
-      learningContent: '/api/learning-content',
-      admin: '/api/admin'
-    }
-  });
-});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
