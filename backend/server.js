@@ -26,15 +26,20 @@ app.use(helmet());
 app.set('trust proxy', 1);
 
 // CORS configuration
+// Explicitly allow both custom domain and Netlify subdomain
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
   : process.env.NODE_ENV === 'production' 
-    ? ['https://sensebait.pro', 'https://www.sensebait.pro'] 
+    ? [
+        'https://sensebait.pro', 
+        'https://www.sensebait.pro',
+        'https://beamish-granita-b7abb8.netlify.app' // Explicit Netlify subdomain
+      ] 
     : ['http://localhost:3000'];
 
-// Add Netlify domains pattern if in production
+// Add Netlify domains pattern to allow all Netlify subdomains (including future ones)
 if (process.env.NODE_ENV === 'production') {
-  // Allow all Netlify subdomains
+  // Allow all Netlify subdomains via regex pattern
   allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
 }
 
