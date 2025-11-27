@@ -60,6 +60,25 @@ app.use('/api/sections', sectionRoutes);
 app.use('/api/learning-content', learningContentRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Root endpoint - API information
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Social Engineering Learning API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      modules: '/api/modules',
+      questions: '/api/questions',
+      leaderboard: '/api/leaderboard',
+      user: '/api/user',
+      sections: '/api/sections',
+      learningContent: '/api/learning-content',
+      admin: '/api/admin'
+    }
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
