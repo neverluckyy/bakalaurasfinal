@@ -61,12 +61,16 @@ router.post('/register', async (req, res) => {
           );
 
           // Set HTTP-only cookie
+          // For cross-domain cookies (Netlify -> Railway), we need:
+          // - secure: true (required for HTTPS)
+          // - sameSite: 'none' (required for cross-site)
+          const isProduction = process.env.NODE_ENV === 'production';
           res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production', // true for HTTPS in production
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site in production
+            secure: isProduction, // true for HTTPS in production
+            sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            domain: undefined // Let browser set domain automatically
+            path: '/' // Explicitly set path
           });
 
           res.status(201).json({
@@ -137,12 +141,16 @@ router.post('/login', async (req, res) => {
         );
 
         // Set HTTP-only cookie
+        // For cross-domain cookies (Netlify -> Railway), we need:
+        // - secure: true (required for HTTPS)
+        // - sameSite: 'none' (required for cross-site)
+        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie('token', token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production', // true for HTTPS in production
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site in production
+          secure: isProduction, // true for HTTPS in production
+          sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production
           maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-          domain: undefined // Let browser set domain automatically
+          path: '/' // Explicitly set path
         });
 
         res.json({
