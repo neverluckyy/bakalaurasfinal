@@ -23,7 +23,7 @@ console.log(`\n🔨 Building frontend with backend URL: ${url}\n`);
 
 // Create .env file
 const envPath = path.join(__dirname, 'frontend', '.env');
-const envContent = `REACT_APP_API_URL=${url}\n`;
+const envContent = `VITE_API_URL=${url}\n`;
 fs.writeFileSync(envPath, envContent);
 console.log(`✅ Created frontend/.env`);
 
@@ -35,7 +35,7 @@ try {
   console.log('🔨 Building...');
   execSync('npm run build', { stdio: 'inherit' });
   console.log('\n✅ Frontend built successfully!');
-  console.log('📁 Files are in: frontend/build/');
+  console.log('📁 Files are in: frontend/dist/');
   console.log('📤 Ready to upload to Hostinger!\n');
   process.chdir('..');
 } catch (error) {
