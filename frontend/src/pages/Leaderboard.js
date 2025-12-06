@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, Medal, Award, Star, TrendingUp, Search, Filter, ArrowUpDown, User } from 'lucide-react';
+import { Trophy, Medal, Award, Star, TrendingUp, Search, ArrowUpDown, User } from 'lucide-react';
 import axios from 'axios';
 import './Leaderboard.css';
 
@@ -21,21 +21,7 @@ const Leaderboard = () => {
   
   const userEntryRef = useRef(null);
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchLeaderboard();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [topLimit, searchQuery, sortBy, sortOrder]);
-
-  useEffect(() => {
-    fetchLeaderboard();
-    fetchUserRank();
-  }, []);
-
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -66,9 +52,9 @@ const Leaderboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [topLimit, searchQuery, sortBy, sortOrder]);
 
-  const fetchUserRank = async () => {
+  const fetchUserRank = useCallback(async () => {
     if (!user?.id) return;
     
     try {
@@ -80,7 +66,21 @@ const Leaderboard = () => {
     } finally {
       setUserRankLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchLeaderboard();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [fetchLeaderboard]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+    fetchUserRank();
+  }, [fetchLeaderboard, fetchUserRank]);
 
   const scrollToUser = async () => {
     // If user is already in the current list, just scroll to them

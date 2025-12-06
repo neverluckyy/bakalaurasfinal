@@ -96,7 +96,7 @@ const Support = () => {
     }
 
     try {
-      const response = await axios.post('/api/support/contact', formData, {
+      await axios.post('/api/support/contact', formData, {
         withCredentials: true
       });
       
