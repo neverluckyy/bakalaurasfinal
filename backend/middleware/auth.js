@@ -37,7 +37,7 @@ const getUserProfile = async (req, res, next) => {
     }
     
     db.get(
-      'SELECT id, email, display_name, avatar_key, total_xp, level, is_admin FROM users WHERE id = ?',
+      'SELECT id, email, display_name, avatar_key, total_xp, level, is_admin, email_verified, new_email, email_verification_expires FROM users WHERE id = ?',
       [req.user.id],
       (err, user) => {
         if (err) {

@@ -93,6 +93,104 @@ router.post('/:sectionId/learn', authenticateToken, (req, res) => {
   res.json({ success: true, message: 'Section marked as learned' });
 });
 
+// Save quiz draft state (in-progress answers)
+router.post('/:sectionId/quiz/draft', authenticateToken, (req, res) => {
+  const { sectionId } = req.params;
+  const { currentQuestionIndex, draftAnswers } = req.body;
+  const userId = req.user.id;
+  const db = getDatabase();
+
+  if (currentQuestionIndex === undefined || currentQuestionIndex < 0) {
+    return res.status(400).json({ error: 'Valid currentQuestionIndex is required' });
+  }
+
+  const draftAnswersJson = JSON.stringify(draftAnswers || {});
+
+  const query = `
+    INSERT OR REPLACE INTO quiz_draft_state 
+    (user_id, section_id, current_question_index, draft_answers, updated_at) 
+    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `;
+
+  db.run(query, [userId, sectionId, currentQuestionIndex, draftAnswersJson], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Quiz draft saved',
+      currentQuestionIndex,
+      draftAnswers: draftAnswers || {}
+    });
+  });
+});
+
+// Get quiz draft state
+router.get('/:sectionId/quiz/draft', authenticateToken, (req, res) => {
+  const { sectionId } = req.params;
+  const userId = req.user.id;
+  const db = getDatabase();
+
+  const query = `
+    SELECT current_question_index, draft_answers 
+    FROM quiz_draft_state 
+    WHERE user_id = ? AND section_id = ?
+  `;
+
+  db.get(query, [userId, sectionId], (err, row) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!row) {
+      return res.json({ 
+        currentQuestionIndex: 0,
+        draftAnswers: {}
+      });
+    }
+
+    let draftAnswers = {};
+    try {
+      draftAnswers = row.draft_answers ? JSON.parse(row.draft_answers) : {};
+    } catch (parseError) {
+      console.error('Error parsing draft answers:', parseError);
+      draftAnswers = {};
+    }
+
+    res.json({ 
+      currentQuestionIndex: row.current_question_index || 0,
+      draftAnswers
+    });
+  });
+});
+
+// Clear quiz draft state (after quiz completion)
+router.delete('/:sectionId/quiz/draft', authenticateToken, (req, res) => {
+  const { sectionId } = req.params;
+  const userId = req.user.id;
+  const db = getDatabase();
+
+  const query = `
+    DELETE FROM quiz_draft_state 
+    WHERE user_id = ? AND section_id = ?
+  `;
+
+  db.run(query, [userId, sectionId], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Quiz draft cleared'
+    });
+  });
+});
+
 // Submit quiz results
 router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
   const { sectionId } = req.params;
@@ -151,6 +249,18 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
         );
       });
     }
+    
+    // Clear draft state after successful submission
+    await new Promise((resolve, reject) => {
+      db.run(
+        'DELETE FROM quiz_draft_state WHERE user_id = ? AND section_id = ?',
+        [userId, sectionId],
+        function(err) {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
     
     // Update user XP and level
     await new Promise((resolve, reject) => {

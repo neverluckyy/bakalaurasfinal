@@ -3,20 +3,41 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getDatabase } = require('../database/init');
 const { authenticateToken, getUserProfile } = require('../middleware/auth');
+const { validatePassword, validateEmail, validateDisplayName } = require('../utils/passwordValidation');
+const { generateToken, sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
 const router = express.Router();
 
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, display_name, avatar_key } = req.body;
+    const { email, password, display_name, avatar_key, terms_accepted, privacy_accepted } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      return res.status(400).json({ error: emailValidation.errors[0] || 'Invalid email address' });
+    }
+
+    // Validate display name
+    const displayNameValidation = validateDisplayName(display_name);
+    if (!displayNameValidation.isValid) {
+      return res.status(400).json({ error: displayNameValidation.errors[0] || 'Invalid display name' });
+    }
+
+    // Validate password with strength requirements
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ error: passwordValidation.errors[0] || 'Password does not meet security requirements' });
+    }
+
+    // Validate consent
+    if (!terms_accepted || !privacy_accepted) {
+      return res.status(400).json({ error: 'You must accept the Terms of Use and Privacy Policy to register' });
     }
 
     const db = getDatabase();
@@ -42,18 +63,38 @@ router.post('/register', async (req, res) => {
       const saltRounds = 12;
       const passwordHash = await bcrypt.hash(password, saltRounds);
 
-      // Create user
+      // Set consent information
+      const termsVersion = '1.0'; // Current version of Terms of Use
+      const privacyVersion = '1.0'; // Current version of Privacy Policy
+      const consentTimestamp = new Date().toISOString();
+
+      // Generate email verification token
+      const verificationToken = generateToken();
+      const verificationExpires = new Date();
+      verificationExpires.setDate(verificationExpires.getDate() + 5); // 5 days
+
+      const finalDisplayName = display_name || email.split('@')[0];
+
+      // Create user (email_verified defaults to 0/false)
       db.run(
-        'INSERT INTO users (email, password_hash, display_name, avatar_key) VALUES (?, ?, ?, ?)',
-        [email, passwordHash, display_name || email.split('@')[0], avatar_key || 'robot_coral'],
-        function(err) {
+        'INSERT INTO users (email, password_hash, display_name, avatar_key, terms_version, privacy_version, consent_timestamp, email_verified, email_verification_token, email_verification_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [email, passwordHash, finalDisplayName, avatar_key || 'robot_coral', termsVersion, privacyVersion, consentTimestamp, 0, verificationToken, verificationExpires.toISOString()],
+        async function(err) {
           if (err) {
             return res.status(500).json({ error: 'Failed to create user' });
           }
 
           const userId = this.lastID;
           
-          // Generate JWT token
+          // Send verification email
+          const emailResult = await sendVerificationEmail(email, verificationToken, finalDisplayName);
+          
+          if (!emailResult.success) {
+            console.error('Failed to send verification email:', emailResult.error);
+            // Still return success, but inform user they need to verify
+          }
+
+          // Generate full JWT token - user can log in immediately
           const token = jwt.sign(
             { id: userId, email },
             process.env.JWT_SECRET,
@@ -61,28 +102,27 @@ router.post('/register', async (req, res) => {
           );
 
           // Set HTTP-only cookie
-          // For cross-domain cookies (Netlify -> Railway), we need:
-          // - secure: true (required for HTTPS)
-          // - sameSite: 'none' (required for cross-site)
           const isProduction = process.env.NODE_ENV === 'production';
           res.cookie('token', token, {
             httpOnly: true,
-            secure: isProduction, // true for HTTPS in production
-            sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            path: '/' // Explicitly set path
+            path: '/'
           });
 
           res.status(201).json({
-            message: 'User created successfully',
-            token: token, // Also return token in response for localStorage
+            message: 'Account created successfully. A verification email has been sent to your email address. Please verify your email within 5 days.',
+            token: token,
             user: {
               id: userId,
               email,
-              display_name: display_name || email.split('@')[0],
+              display_name: finalDisplayName,
               avatar_key: avatar_key || 'robot_coral',
               total_xp: 0,
-              level: 1
+              level: 1,
+              email_verified: false,
+              email_verification_expires: verificationExpires.toISOString()
             }
           });
         }
@@ -114,7 +154,7 @@ router.post('/login', async (req, res) => {
     }
     
     db.get(
-      'SELECT id, email, password_hash, display_name, avatar_key, total_xp, level, is_admin FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, display_name, avatar_key, total_xp, level, is_admin, email_verified FROM users WHERE email = ?',
       [email],
       async (err, user) => {
         if (err) {
@@ -138,6 +178,7 @@ router.post('/login', async (req, res) => {
           return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        // Allow login even if email is not verified (user has 5 days to verify)
         console.log(`Login successful for user: ${user.email}`);
 
         // Generate JWT token
@@ -170,19 +211,51 @@ router.post('/login', async (req, res) => {
         
         res.cookie('token', token, cookieOptions);
 
-        res.json({
-          message: 'Login successful',
-          token: token, // Also return token in response for localStorage
-          user: {
-            id: user.id,
-            email: user.email,
-            display_name: user.display_name,
-            avatar_key: user.avatar_key,
-            total_xp: user.total_xp,
-            level: user.level,
-            is_admin: user.is_admin || 0
-          }
-        });
+        // Get email verification expiration if not verified
+        let emailVerificationExpires = null;
+        if (!user.email_verified) {
+          db.get(
+            'SELECT email_verification_expires FROM users WHERE id = ?',
+            [user.id],
+            (err, verificationData) => {
+              if (!err && verificationData) {
+                emailVerificationExpires = verificationData.email_verification_expires;
+              }
+              
+              res.json({
+                message: 'Login successful',
+                token: token,
+                user: {
+                  id: user.id,
+                  email: user.email,
+                  display_name: user.display_name,
+                  avatar_key: user.avatar_key,
+                  total_xp: user.total_xp,
+                  level: user.level,
+                  is_admin: user.is_admin || 0,
+                  email_verified: user.email_verified || 0,
+                  email_verification_expires: emailVerificationExpires
+                }
+              });
+            }
+          );
+        } else {
+          res.json({
+            message: 'Login successful',
+            token: token,
+            user: {
+              id: user.id,
+              email: user.email,
+              display_name: user.display_name,
+              avatar_key: user.avatar_key,
+              total_xp: user.total_xp,
+              level: user.level,
+              is_admin: user.is_admin || 0,
+              email_verified: user.email_verified || 0,
+              email_verification_expires: null
+            }
+          });
+        }
       }
     );
   } catch (error) {
@@ -205,6 +278,270 @@ router.get('/me', authenticateToken, getUserProfile, (req, res) => {
   res.json({
     user: req.userProfile
   });
+});
+
+// Verify email address
+router.get('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    const db = getDatabase();
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+
+    // Find user with this verification token
+    db.get(
+      'SELECT id, email, email_verification_expires FROM users WHERE email_verification_token = ?',
+      [token],
+      (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (!user) {
+          return res.status(400).json({ error: 'Invalid or expired verification token' });
+        }
+
+        // Check if token has expired
+        const now = new Date();
+        const expires = new Date(user.email_verification_expires);
+        
+        if (now > expires) {
+          return res.status(400).json({ error: 'Verification token has expired' });
+        }
+
+        // Update user to verified
+        db.run(
+          'UPDATE users SET email_verified = 1, email_verification_token = NULL, email_verification_expires = NULL WHERE id = ?',
+          [user.id],
+          function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to verify email' });
+            }
+
+            res.json({
+              message: 'Email verified successfully',
+              verified: true
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
+});
+
+// Resend verification email
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const db = getDatabase();
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+
+    // Find user
+    db.get(
+      'SELECT id, email, display_name, email_verified FROM users WHERE email = ?',
+      [email],
+      async (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (!user) {
+          // Don't reveal if user exists or not for security
+          return res.json({
+            message: 'If an account exists with this email, a verification email has been sent.'
+          });
+        }
+
+        if (user.email_verified) {
+          return res.status(400).json({ error: 'Email is already verified' });
+        }
+
+          // Generate new verification token
+          const verificationToken = generateToken();
+          const verificationExpires = new Date();
+          verificationExpires.setDate(verificationExpires.getDate() + 5); // 5 days
+
+        // Update user with new token
+        db.run(
+          'UPDATE users SET email_verification_token = ?, email_verification_expires = ? WHERE id = ?',
+          [verificationToken, verificationExpires.toISOString(), user.id],
+          async function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to update verification token' });
+            }
+
+            // Send verification email
+            const emailResult = await sendVerificationEmail(user.email, verificationToken, user.display_name);
+            
+            if (!emailResult.success) {
+              console.error('Failed to send verification email:', emailResult.error);
+              return res.status(500).json({ error: 'Failed to send verification email' });
+            }
+
+            res.json({
+              message: 'Verification email sent successfully'
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
+});
+
+// Request password reset
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const db = getDatabase();
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+
+    // Find user
+    db.get(
+      'SELECT id, email, display_name FROM users WHERE email = ?',
+      [email],
+      async (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        // Don't reveal if user exists or not for security
+        // Always return success message
+        if (user) {
+          // Generate password reset token
+          const resetToken = generateToken();
+          const resetExpires = new Date();
+          resetExpires.setHours(resetExpires.getHours() + 1); // 1 hour
+
+          // Update user with reset token
+          db.run(
+            'UPDATE users SET password_reset_token = ?, password_reset_expires = ? WHERE id = ?',
+            [resetToken, resetExpires.toISOString(), user.id],
+            async function(err) {
+              if (err) {
+                console.error('Database error:', err);
+                // Still return success for security
+              } else {
+                // Send password reset email
+                await sendPasswordResetEmail(user.email, resetToken, user.display_name);
+              }
+            }
+          );
+        }
+
+        // Always return success to prevent email enumeration
+        res.json({
+          message: 'If an account exists with this email, a password reset link has been sent.'
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
+});
+
+// Reset password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    // Validate new password
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ error: passwordValidation.errors[0] || 'Password does not meet security requirements' });
+    }
+
+    const db = getDatabase();
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+
+    // Find user with this reset token
+    db.get(
+      'SELECT id, password_reset_expires FROM users WHERE password_reset_token = ?',
+      [token],
+      async (err, user) => {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (!user) {
+          return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        // Check if token has expired
+        const now = new Date();
+        const expires = new Date(user.password_reset_expires);
+        
+        if (now > expires) {
+          return res.status(400).json({ error: 'Reset token has expired' });
+        }
+
+        // Hash new password
+        const saltRounds = 12;
+        const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+        // Update password and clear reset token
+        db.run(
+          'UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL WHERE id = ?',
+          [passwordHash, user.id],
+          function(err) {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to reset password' });
+            }
+
+            res.json({
+              message: 'Password reset successfully'
+            });
+          }
+        );
+      }
+    );
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
 });
 
 module.exports = router;

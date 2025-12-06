@@ -14,6 +14,7 @@ const userRoutes = require('./routes/user');
 const sectionRoutes = require('./routes/sections');
 const learningContentRoutes = require('./routes/learning-content');
 const adminRoutes = require('./routes/admin');
+const supportRoutes = require('./routes/support');
 const { initDatabase } = require('./database/init');
 
 const app = express();
@@ -81,6 +82,7 @@ app.use(cookieParser());
 
 // Static files
 app.use('/avatars', express.static(path.join(__dirname, '../frontend/public/avatars')));
+app.use('/phishing-examples', express.static(path.join(__dirname, '../frontend/public/phishing-examples')));
 
 // Routes
 // Test endpoint to verify routes are loading
@@ -96,6 +98,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/sections', sectionRoutes);
 app.use('/api/learning-content', learningContentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/support', supportRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -138,6 +141,7 @@ async function startServer() {
       console.log('  - /api/modules/*');
       console.log('  - /api/user/*');
       console.log('  - /api/sections/*');
+      console.log('  - /api/support/*');
     });
   } catch (error) {
     console.error('Failed to start server:', error);

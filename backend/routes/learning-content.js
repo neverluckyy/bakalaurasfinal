@@ -100,4 +100,59 @@ router.get('/section/:sectionId/progress', authenticateToken, (req, res) => {
   });
 });
 
+// Save reading position for a section
+router.post('/section/:sectionId/position', authenticateToken, (req, res) => {
+  const { sectionId } = req.params;
+  const { stepIndex } = req.body;
+  const userId = req.user.id;
+  const db = getDatabase();
+
+  if (stepIndex === undefined || stepIndex < 0) {
+    return res.status(400).json({ error: 'Valid stepIndex is required' });
+  }
+
+  const query = `
+    INSERT OR REPLACE INTO section_reading_position 
+    (user_id, section_id, last_step_index, updated_at) 
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+  `;
+
+  db.run(query, [userId, sectionId, stepIndex], function(err) {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Reading position saved',
+      stepIndex 
+    });
+  });
+});
+
+// Get reading position for a section
+router.get('/section/:sectionId/position', authenticateToken, (req, res) => {
+  const { sectionId } = req.params;
+  const userId = req.user.id;
+  const db = getDatabase();
+
+  const query = `
+    SELECT last_step_index 
+    FROM section_reading_position 
+    WHERE user_id = ? AND section_id = ?
+  `;
+
+  db.get(query, [userId, sectionId], (err, row) => {
+    if (err) {
+      console.error('Database error:', err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    res.json({ 
+      stepIndex: row ? row.last_step_index : 0 
+    });
+  });
+});
+
 module.exports = router;

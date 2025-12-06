@@ -4,6 +4,142 @@
   padding: 0 20px;
 }
 
+/* Email Verification Notification */
+.email-verification-notification {
+  background: linear-gradient(135deg, rgba(255, 165, 2, 0.15) 0%, rgba(255, 165, 2, 0.05) 100%);
+  border: 2px solid #ffa502;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.notification-icon {
+  color: #ffa502;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notification-text {
+  flex: 1;
+}
+
+.notification-text strong {
+  color: #ffffff;
+  font-size: 16px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.notification-text p {
+  color: #E0E0E0;
+  font-size: 14px;
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.notification-text p strong {
+  color: #ffa502;
+  display: inline;
+  font-size: 14px;
+  margin: 0;
+}
+
+.resend-success {
+  color: #2ed573 !important;
+  font-size: 13px !important;
+  margin-top: 8px !important;
+}
+
+.countdown-text {
+  margin-top: 8px !important;
+  font-size: 14px !important;
+}
+
+.countdown-text .warning {
+  color: #ffa502 !important;
+  font-weight: 600;
+}
+
+.countdown-text .expired {
+  color: #ff4757 !important;
+  font-weight: 600;
+}
+
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.notification-dismiss {
+  background: transparent;
+  border: none;
+  color: #8A8A9A;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.notification-dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .email-verification-notification {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .notification-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .notification-text strong {
+    font-size: 15px;
+  }
+
+  .notification-text p {
+    font-size: 13px;
+  }
+}
+
 /* Hero Section */
 .hero-section {
   background: linear-gradient(135deg, #282840 0%, #3A3A5A 100%);

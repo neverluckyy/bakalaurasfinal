@@ -23,10 +23,96 @@ function initDatabase() {
             total_xp INTEGER DEFAULT 0,
             level INTEGER DEFAULT 1,
             is_admin INTEGER DEFAULT 0,
+            terms_version TEXT,
+            privacy_version TEXT,
+            consent_timestamp DATETIME,
+            email_verified INTEGER DEFAULT 0,
+            email_verification_token TEXT,
+            email_verification_expires DATETIME,
+            password_reset_token TEXT,
+            password_reset_expires DATETIME,
+            new_email TEXT,
+            new_email_verification_token TEXT,
+            new_email_verification_expires DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )
-        `);
+        `, (err) => {
+          if (err) {
+            console.error('Error creating users table:', err);
+            return;
+          }
+          
+          // Add consent columns if they don't exist (for existing databases)
+          db.run(`ALTER TABLE users ADD COLUMN terms_version TEXT`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add terms_version column:', err.message);
+            }
+          });
+          
+          db.run(`ALTER TABLE users ADD COLUMN privacy_version TEXT`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add privacy_version column:', err.message);
+            }
+          });
+          
+          db.run(`ALTER TABLE users ADD COLUMN consent_timestamp DATETIME`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add consent_timestamp column:', err.message);
+            }
+          });
+          
+          // Add email verification columns if they don't exist
+          db.run(`ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add email_verified column:', err.message);
+            }
+          });
+          
+          db.run(`ALTER TABLE users ADD COLUMN email_verification_token TEXT`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add email_verification_token column:', err.message);
+            }
+          });
+          
+          db.run(`ALTER TABLE users ADD COLUMN email_verification_expires DATETIME`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add email_verification_expires column:', err.message);
+            }
+          });
+          
+          // Add password reset columns if they don't exist
+          db.run(`ALTER TABLE users ADD COLUMN password_reset_token TEXT`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add password_reset_token column:', err.message);
+            }
+          });
+          
+          db.run(`ALTER TABLE users ADD COLUMN password_reset_expires DATETIME`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add password_reset_expires column:', err.message);
+            }
+          });
+          
+          // Add email change columns if they don't exist
+          db.run(`ALTER TABLE users ADD COLUMN new_email TEXT`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add new_email column:', err.message);
+            }
+          });
+          
+          db.run(`ALTER TABLE users ADD COLUMN new_email_verification_token TEXT`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add new_email_verification_token column:', err.message);
+            }
+          });
+          
+          db.run(`ALTER TABLE users ADD COLUMN new_email_verification_expires DATETIME`, (err) => {
+            if (err && !err.message.includes('duplicate column')) {
+              console.warn('Warning: Could not add new_email_verification_expires column:', err.message);
+            }
+          });
+        });
 
         // Modules table
         db.run(`
@@ -115,6 +201,35 @@ function initDatabase() {
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (learning_content_id) REFERENCES learning_content (id),
             UNIQUE(user_id, learning_content_id)
+          )
+        `);
+
+        // Section reading position table (for resuming learning)
+        db.run(`
+          CREATE TABLE IF NOT EXISTS section_reading_position (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            section_id INTEGER NOT NULL,
+            last_step_index INTEGER DEFAULT 0,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (section_id) REFERENCES sections (id),
+            UNIQUE(user_id, section_id)
+          )
+        `);
+
+        // Quiz draft state table (for saving in-progress quiz answers)
+        db.run(`
+          CREATE TABLE IF NOT EXISTS quiz_draft_state (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            section_id INTEGER NOT NULL,
+            current_question_index INTEGER DEFAULT 0,
+            draft_answers TEXT, -- JSON object mapping question index to selected answer
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (section_id) REFERENCES sections (id),
+            UNIQUE(user_id, section_id)
           )
         `);
 

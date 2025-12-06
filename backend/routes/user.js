@@ -1,6 +1,9 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const { getDatabase } = require('../database/init');
 const { authenticateToken } = require('../middleware/auth');
+const { validatePassword, validateEmail, validateDisplayName } = require('../utils/passwordValidation');
+const { generateToken, sendEmailChangeVerificationEmail, sendEmailChangeNotification } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -207,58 +210,266 @@ router.get('/achievements', authenticateToken, (req, res) => {
 });
 
 // Update user profile
-router.put('/profile', authenticateToken, (req, res) => {
-  const db = getDatabase();
-  const userId = req.user.id;
-  const { display_name, email, avatar_key } = req.body;
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const db = getDatabase();
+    const userId = req.user.id;
+    const { display_name, email, avatar_key } = req.body;
 
-  // Validate input
-  if (!display_name || !email) {
-    return res.status(400).json({ error: 'Display name and email are required' });
-  }
-
-  // Check if email is already taken by another user
-  const emailCheckQuery = `SELECT id FROM users WHERE email = ? AND id != ?`;
-  
-  db.get(emailCheckQuery, [email, userId], (err, existingUser) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Database error' });
+    // Validate input
+    if (!display_name || !email) {
+      return res.status(400).json({ error: 'Display name and email are required' });
     }
 
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email is already taken' });
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      return res.status(400).json({ error: emailValidation.errors[0] || 'Invalid email address' });
     }
 
-    // Update user profile
-    const updateQuery = `
-      UPDATE users 
-      SET display_name = ?, email = ?, avatar_key = ?
-      WHERE id = ?
-    `;
+    // Validate display name
+    const displayNameValidation = validateDisplayName(display_name);
+    if (!displayNameValidation.isValid) {
+      return res.status(400).json({ error: displayNameValidation.errors[0] || 'Invalid display name' });
+    }
 
-    db.run(updateQuery, [display_name, email, avatar_key || 'robot_coral', userId], function(err) {
+    // Get current user data
+    db.get('SELECT email, display_name FROM users WHERE id = ?', [userId], async (err, currentUser) => {
       if (err) {
         console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to update profile' });
+        return res.status(500).json({ error: 'Database error' });
       }
 
-      // Get updated user data
-      const getUserQuery = `SELECT id, email, display_name, avatar_key, total_xp, level FROM users WHERE id = ?`;
-      
-      db.get(getUserQuery, [userId], (err, updatedUser) => {
+      if (!currentUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const emailChanged = email !== currentUser.email;
+
+      // If email changed, require verification (R3.3)
+      if (emailChanged) {
+        // Check if new email is already taken
+        const emailCheckQuery = `SELECT id FROM users WHERE email = ? AND id != ?`;
+        
+        db.get(emailCheckQuery, [email, userId], async (err, existingUser) => {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Database error' });
+          }
+
+          if (existingUser) {
+            return res.status(400).json({ error: 'Email is already taken' });
+          }
+
+          // Generate verification token for new email
+          const verificationToken = generateToken();
+          const verificationExpires = new Date();
+          verificationExpires.setDate(verificationExpires.getDate() + 5); // 5 days
+
+          // Store new email and verification token (don't update email yet)
+          db.run(
+            'UPDATE users SET display_name = ?, avatar_key = ?, new_email = ?, new_email_verification_token = ?, new_email_verification_expires = ? WHERE id = ?',
+            [display_name, avatar_key || 'robot_coral', email, verificationToken, verificationExpires.toISOString(), userId],
+            async function(err) {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to update profile' });
+              }
+
+              // Send verification email to new email address
+              const emailResult = await sendEmailChangeVerificationEmail(email, verificationToken, display_name);
+              
+              // Send notification to old email address
+              await sendEmailChangeNotification(currentUser.email, email, display_name);
+
+              // Get updated user data
+              const getUserQuery = `SELECT id, email, display_name, avatar_key, total_xp, level, new_email FROM users WHERE id = ?`;
+              
+              db.get(getUserQuery, [userId], (err, updatedUser) => {
+                if (err) {
+                  console.error('Database error:', err);
+                  return res.status(500).json({ error: 'Failed to retrieve updated user data' });
+                }
+
+                res.json({ 
+                  message: 'Profile updated. Please verify your new email address. A verification email has been sent to the new address.',
+                  requiresEmailVerification: true,
+                  user: updatedUser
+                });
+              });
+            }
+          );
+        });
+      } else {
+        // Email didn't change, just update display name and avatar
+        const updateQuery = `
+          UPDATE users 
+          SET display_name = ?, avatar_key = ?
+          WHERE id = ?
+        `;
+
+        db.run(updateQuery, [display_name, avatar_key || 'robot_coral', userId], function(err) {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to update profile' });
+          }
+
+          // Get updated user data
+          const getUserQuery = `SELECT id, email, display_name, avatar_key, total_xp, level FROM users WHERE id = ?`;
+          
+          db.get(getUserQuery, [userId], (err, updatedUser) => {
+            if (err) {
+              console.error('Database error:', err);
+              return res.status(500).json({ error: 'Failed to retrieve updated user data' });
+            }
+
+            res.json({ 
+              message: 'Profile updated successfully',
+              user: updatedUser
+            });
+          });
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
+});
+
+// Verify email change
+router.get('/verify-email-change', async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required' });
+    }
+
+    const db = getDatabase();
+    
+    if (!db) {
+      return res.status(500).json({ error: 'Database connection error' });
+    }
+
+    // Find user with this verification token
+    db.get(
+      'SELECT id, email, new_email, new_email_verification_expires FROM users WHERE new_email_verification_token = ?',
+      [token],
+      (err, user) => {
         if (err) {
           console.error('Database error:', err);
-          return res.status(500).json({ error: 'Failed to retrieve updated user data' });
+          return res.status(500).json({ error: 'Database error' });
         }
 
-        res.json({ 
-          message: 'Profile updated successfully',
-          user: updatedUser
+        if (!user) {
+          return res.status(400).json({ error: 'Invalid or expired verification token' });
+        }
+
+        // Check if token has expired
+        const now = new Date();
+        const expires = new Date(user.new_email_verification_expires);
+        
+        if (now > expires) {
+          return res.status(400).json({ error: 'Verification token has expired' });
+        }
+
+        // Check if new email is already taken by another user
+        db.get('SELECT id FROM users WHERE email = ? AND id != ?', [user.new_email, user.id], (err, existingUser) => {
+          if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Database error' });
+          }
+
+          if (existingUser) {
+            // Clear the pending email change
+            db.run('UPDATE users SET new_email = NULL, new_email_verification_token = NULL, new_email_verification_expires = NULL WHERE id = ?', [user.id]);
+            return res.status(400).json({ error: 'This email address is already in use by another account' });
+          }
+
+          // Update email and clear verification fields
+          db.run(
+            'UPDATE users SET email = ?, email_verified = 1, new_email = NULL, new_email_verification_token = NULL, new_email_verification_expires = NULL WHERE id = ?',
+            [user.new_email, user.id],
+            function(err) {
+              if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to update email' });
+              }
+
+              res.json({
+                message: 'Email address changed successfully',
+                verified: true
+              });
+            }
+          );
         });
+      }
+    );
+  } catch (error) {
+    console.error('Email change verification error:', error);
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
+});
+
+// Change password
+router.put('/password', authenticateToken, async (req, res) => {
+  try {
+    const db = getDatabase();
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    // Validate new password with strength requirements
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ error: passwordValidation.errors[0] || 'New password does not meet security requirements' });
+    }
+
+    // Get user's current password hash
+    db.get('SELECT password_hash FROM users WHERE id = ?', [userId], async (err, user) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify current password
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      // Check if new password is the same as current password
+      const isSamePassword = await bcrypt.compare(newPassword, user.password_hash);
+      if (isSamePassword) {
+        return res.status(400).json({ error: 'New password must be different from your current password' });
+      }
+
+      // Hash new password
+      const saltRounds = 12;
+      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+      // Update password
+      db.run('UPDATE users SET password_hash = ? WHERE id = ?', [newPasswordHash, userId], function(err) {
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ error: 'Failed to update password' });
+        }
+
+        res.json({ message: 'Password updated successfully' });
       });
     });
-  });
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
 });
 
 module.exports = router;

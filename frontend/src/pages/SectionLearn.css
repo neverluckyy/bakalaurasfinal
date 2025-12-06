@@ -516,3 +516,40 @@
     font-size: 0.9rem;
   }
 }
+
+/* Empty State Styles */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: #8A8A9A;
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  color: #6A5ACD;
+  margin: 0 auto 24px;
+  opacity: 0.7;
+}
+
+.empty-state h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #ffffff;
+}
+
+.empty-state p {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.empty-subtitle {
+  font-size: 14px;
+  color: #6A6A7A;
+  margin-bottom: 24px;
+}
+
+.empty-state .btn {
+  margin-top: 16px;
+}
