@@ -1,0 +1,70 @@
+# Railway ignore file - excludes files from build context
+# This helps prevent "mount options is too long" errors
+
+# Exclude frontend entirely (we only need backend)
+frontend/
+
+# Exclude all node_modules
+**/node_modules/
+node_modules/
+
+# Exclude build outputs
+**/dist/
+**/build/
+dist/
+build/
+
+# Exclude documentation
+*.md
+!README.md
+
+# Exclude test files
+test/
+tests/
+**/__tests__/
+*.test.*
+*.spec.*
+
+# Exclude git
+.git/
+.gitignore
+.gitattributes
+
+# Exclude IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Exclude OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Exclude environment files
+.env
+.env.*
+*.env
+
+# Exclude database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Exclude logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Exclude coverage
+coverage/
+.nyc_output/
+
+# Exclude cache
+.cache/
+.temp/
+.npm/
+

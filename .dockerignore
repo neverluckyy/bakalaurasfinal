@@ -73,10 +73,8 @@ coverage/
 .cache/
 .temp/
 
-# Frontend specific (if building from root)
-frontend/node_modules/
-frontend/dist/
-frontend/build/
+# Frontend directory (exclude entirely - we only need backend)
+frontend/
 
 # Backend specific (if building from root)
 backend/node_modules/

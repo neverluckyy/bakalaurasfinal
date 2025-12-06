@@ -1,0 +1,15 @@
+# Root-level Nixpacks configuration
+# This tells Railway to only build from the backend directory
+
+[phases.setup]
+nixPkgs = ["nodejs-22_x", "python3", "make", "gcc"]
+
+[phases.install]
+cmds = ["cd backend && npm ci", "cd backend && npm rebuild sqlite3 --build-from-source"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "cd backend && node server.js"
+
