@@ -5,6 +5,11 @@
   RewriteEngine On
   RewriteBase /
   
+  # Proxy API requests to Railway backend
+  # This forwards /api/* requests to the Railway backend
+  RewriteCond %{REQUEST_URI} ^/api/(.*)$
+  RewriteRule ^api/(.*)$ https://bakalaurasfinal-bak.up.railway.app/api/$1 [P,L]
+  
   # Don't rewrite files or directories
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

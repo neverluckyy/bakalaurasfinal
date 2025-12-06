@@ -8,6 +8,8 @@
   publish = "dist"
 
 # Redirect rules for React Router (SPA)
+# Note: API requests are handled via VITE_API_URL environment variable
+# Set VITE_API_URL=https://bakalaurasfinal-bak.up.railway.app in Netlify dashboard
 [[redirects]]
   from = "/*"
   to = "/index.html"
