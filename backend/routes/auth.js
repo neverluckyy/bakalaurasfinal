@@ -1,12 +1,22 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { getDatabase } = require('../database/init');
 const { authenticateToken, getUserProfile } = require('../middleware/auth');
 const { validatePassword, validateEmail, validateDisplayName } = require('../utils/passwordValidation');
 const { generateToken, sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
 const router = express.Router();
+
+// More lenient rate limiting for /me endpoint (called frequently for auth checks)
+const meLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 100 : 200, // More lenient for read-only auth checks
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Register
 router.post('/register', async (req, res) => {
@@ -274,7 +284,7 @@ router.post('/logout', (req, res) => {
 });
 
 // Get current user profile
-router.get('/me', authenticateToken, getUserProfile, (req, res) => {
+router.get('/me', meLimiter, authenticateToken, getUserProfile, (req, res) => {
   res.json({
     user: req.userProfile
   });

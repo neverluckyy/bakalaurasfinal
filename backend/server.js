@@ -66,13 +66,14 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting for auth routes
+// Rate limiting for auth routes (stricter for login/register)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 20 : 50, // Increased for testing (was 5)
+  max: process.env.NODE_ENV === 'production' ? 30 : 100, // Increased to prevent false positives
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: (req) => req.path === '/me' // Skip rate limiting for /me endpoint (handled separately)
 });
 
 // Body parsing middleware

@@ -25,7 +25,9 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const response = await axios.get('/api/auth/me');
+      const response = await axios.get('/api/auth/me', {
+        withCredentials: true
+      });
       setUser(response.data.user);
     } catch (error) {
       // Token might be invalid, clear it
