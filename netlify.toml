@@ -4,8 +4,8 @@
   # Build command
   command = "npm run build"
   # Directory to publish (where the built files are)
-  # Vite builds to 'dist' directory instead of 'build'
-  publish = "dist"
+  # Create React App builds to 'build' directory
+  publish = "build"
 
 # Redirect rules for React Router (SPA)
 # Note: API requests are handled via VITE_API_URL environment variable
