@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Shield, Palette, Save, ArrowLeft, Eye, EyeOff, Lock } from 'lucide-react';
+import { User, Shield, Palette, Save, ArrowLeft, Eye, EyeOff, Lock } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { validatePassword } from '../utils/passwordValidation';
@@ -153,7 +153,7 @@ const Settings = () => {
     }
 
     try {
-      const response = await axios.put('/api/user/password', {
+      await axios.put('/api/user/password', {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
       }, {

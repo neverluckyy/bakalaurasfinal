@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, BookOpen, CheckCircle, Play } from 'lucide-react';
+import { ArrowLeft, BookOpen, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import './SectionLearn.css';
 
@@ -294,7 +294,7 @@ const SectionLearn = () => {
 
               lines.forEach((line, index) => {
                 // Remove bullet point characters from the beginning of lines
-                const cleanLine = line.replace(/^[•\-\*]\s*/, '');
+                const cleanLine = line.replace(/^[•\-*]\s*/, '');
                 
                 // Check for markdown image syntax: ![alt text](image-path)
                 const imageMatch = cleanLine.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);

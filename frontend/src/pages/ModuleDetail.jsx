@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 
-import { BookOpen, Play, CheckCircle, Lock, Info } from 'lucide-react';
+import { BookOpen, Play, CheckCircle, Info } from 'lucide-react';
 import axios from 'axios';
 import './ModuleDetail.css';
 
@@ -15,7 +15,7 @@ const ModuleDetail = () => {
   const [error, setError] = useState(null);
   const [sectionProgress, setSectionProgress] = useState({}); // Map of sectionId -> hasProgress
 
-  const fetchModuleData = async () => {
+  const fetchModuleData = useCallback(async () => {
     try {
       const [moduleRes, sectionsRes] = await Promise.all([
         axios.get(`/api/modules/${moduleId}`),
@@ -81,11 +81,11 @@ const ModuleDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [moduleId]);
 
   useEffect(() => {
     fetchModuleData();
-  }, [moduleId]);
+  }, [moduleId, fetchModuleData]);
 
   // Refresh data when returning from quiz completion
   useEffect(() => {
@@ -94,7 +94,7 @@ const ModuleDetail = () => {
       // Clear the refresh state
       window.history.replaceState({}, document.title);
     }
-  }, [location.state?.refresh, loading]);
+  }, [location.state?.refresh, loading, fetchModuleData]);
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, CheckCircle, XCircle, Trophy, Star, Info } from 'lucide-react';
@@ -24,21 +24,20 @@ const SectionQuiz = () => {
   const [moduleId, setModuleId] = useState(null);
   const [saveStatus, setSaveStatus] = useState(null); // 'saving', 'saved', 'error'
   const [questionOrder, setQuestionOrder] = useState([]); // Store randomized question order
-  const [answerOrderMap, setAnswerOrderMap] = useState({}); // Store randomized answer order for each question
   const PASSING_THRESHOLD = 70; // Passing threshold percentage
 
   // Helper function to shuffle array (Fisher-Yates algorithm)
-  const shuffleArray = (array) => {
+  const shuffleArray = useCallback((array) => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled;
-  };
+  }, []);
 
   // Randomize questions and answers
-  const randomizeQuiz = (questionsData) => {
+  const randomizeQuiz = useCallback((questionsData) => {
     // Randomize question order
     const questionIndices = questionsData.map((_, index) => index);
     const randomizedIndices = shuffleArray(questionIndices);
@@ -54,7 +53,6 @@ const SectionQuiz = () => {
         answerOrder[originalIndex] = randomizedOptionIndices;
       }
     });
-    setAnswerOrderMap(answerOrder);
 
     // Return questions with randomized order and randomized options
     return randomizedIndices.map((originalIndex) => {
@@ -77,7 +75,7 @@ const SectionQuiz = () => {
       }
       return { ...question, originalIndex: originalIndex };
     });
-  };
+  }, [shuffleArray]);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -162,7 +160,7 @@ const SectionQuiz = () => {
     };
 
     fetchQuestions();
-  }, [sectionId]);
+  }, [sectionId, randomizeQuiz]);
 
   // Save draft state function
   const saveDraftState = async (questionIndex, draftAnswers, showFeedback = false) => {
@@ -303,7 +301,7 @@ const SectionQuiz = () => {
         if (response.data.xpEarned) {
           // Fetch updated user stats to ensure we have the latest data
           try {
-            const userStatsResponse = await axios.get('/api/user/stats');
+            await axios.get('/api/user/stats');
             const updatedUser = { 
               ...user, 
               total_xp: response.data.newTotalXP || (user.total_xp || 0) + response.data.xpEarned,
@@ -396,7 +394,7 @@ const SectionQuiz = () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentQuestion, answers, sectionId, questions.length, quizCompleted]);
+  }, [currentQuestion, answers, sectionId, questions.length, quizCompleted, questionOrder, questions]);
 
   if (loading) {
     return (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { Lock, Eye, EyeOff, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { validatePassword } from '../utils/passwordValidation';
 import './Auth.css';
 

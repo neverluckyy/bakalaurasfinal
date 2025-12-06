@@ -4,11 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   BookOpen, 
   Trophy, 
-  TrendingUp, 
-  Target,
   Star,
-  Award,
-  Mail,
   X,
   AlertCircle
 } from 'lucide-react';
@@ -16,7 +12,7 @@ import axios from 'axios';
 import './Home.css';
 
 function Home() {
-  const { user, updateUser, checkAuth } = useAuth();
+  const { user, checkAuth } = useAuth();
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [overallProgress, setOverallProgress] = useState(0);
@@ -30,7 +26,7 @@ function Home() {
     fetchModules();
     // Refresh user data to get latest email verification status
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   useEffect(() => {
     // Check if email is not verified and calculate days remaining
