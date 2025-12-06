@@ -182,7 +182,7 @@
 }
 
 .input-group .input {
-  padding-left: 44px;
+  padding-left: 44px !important;
   padding-right: 44px;
 }
 
