@@ -47,6 +47,7 @@ Desktop.ini
 JWT_SECRET.txt
 *.secret
 *.key
+.railway-jwt-secret.txt
 
 # Temporary files
 *.tmp
