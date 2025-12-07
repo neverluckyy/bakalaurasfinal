@@ -170,6 +170,12 @@ router.post('/login', async (req, res) => {
       return res.status(500).json({ error: 'Database connection error' });
     }
     
+    // Check if JWT_SECRET is set
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+    
     db.get(
       'SELECT id, email, password_hash, display_name, avatar_key, total_xp, level, is_admin, email_verified FROM users WHERE email = ?',
       [email],
@@ -177,33 +183,78 @@ router.post('/login', async (req, res) => {
         if (err) {
           console.error('Database query error in login:', err);
           console.error('Error details:', JSON.stringify(err, null, 2));
-          return res.status(500).json({ error: 'Database error', message: err.message });
+          if (!res.headersSent) {
+            return res.status(500).json({ error: 'Database error', message: err.message });
+          }
+          return;
         }
         
         if (!user) {
           console.log(`Login attempt failed: User not found for email: ${email}`);
-          return res.status(401).json({ error: 'Invalid credentials' });
+          if (!res.headersSent) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+          }
+          return;
         }
 
         console.log(`Login attempt for user: ${user.email} (ID: ${user.id})`);
         
+        // Check if password_hash exists
+        if (!user.password_hash) {
+          console.error(`User ${user.email} has no password_hash`);
+          if (!res.headersSent) {
+            return res.status(500).json({ error: 'Account error', message: 'Password not set for this account' });
+          }
+          return;
+        }
+        
         // Check password
-        const isValidPassword = await bcrypt.compare(password, user.password_hash);
+        let isValidPassword = false;
+        try {
+          isValidPassword = await bcrypt.compare(password, user.password_hash);
+        } catch (compareError) {
+          console.error('Password comparison error:', compareError);
+          if (!res.headersSent) {
+            return res.status(500).json({ error: 'Server error', message: 'Password verification failed' });
+          }
+          return;
+        }
         
         if (!isValidPassword) {
           console.log(`Login attempt failed: Invalid password for email: ${email}`);
-          return res.status(401).json({ error: 'Invalid credentials' });
+          if (!res.headersSent) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+          }
+          return;
         }
 
         // Allow login even if email is not verified (user has 5 days to verify)
         console.log(`Login successful for user: ${user.email}`);
 
+        // Check if JWT_SECRET is set before generating token
+        if (!process.env.JWT_SECRET) {
+          console.error('JWT_SECRET is not set - cannot generate token');
+          if (!res.headersSent) {
+            return res.status(500).json({ error: 'Server configuration error', message: 'JWT_SECRET not configured' });
+          }
+          return;
+        }
+
         // Generate JWT token
-        const token = jwt.sign(
-          { id: user.id, email: user.email },
-          process.env.JWT_SECRET,
-          { expiresIn: '7d' }
-        );
+        let token;
+        try {
+          token = jwt.sign(
+            { id: user.id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+          );
+        } catch (tokenError) {
+          console.error('Error generating JWT token:', tokenError);
+          if (!res.headersSent) {
+            return res.status(500).json({ error: 'Server error', message: 'Failed to generate authentication token' });
+          }
+          return;
+        }
 
         // Set HTTP-only cookie
         // For cross-domain cookies (Netlify -> Railway), we need:
@@ -235,43 +286,50 @@ router.post('/login', async (req, res) => {
             'SELECT email_verification_expires FROM users WHERE id = ?',
             [user.id],
             (err, verificationData) => {
-              if (!err && verificationData) {
+              if (err) {
+                console.error('Error fetching email verification expiration:', err);
+                // Continue anyway - we'll just set it to null
+              } else if (verificationData) {
                 emailVerificationExpires = verificationData.email_verification_expires;
               }
               
-              res.json({
-                message: 'Login successful',
-                token: token,
-                user: {
-                  id: user.id,
-                  email: user.email,
-                  display_name: user.display_name,
-                  avatar_key: user.avatar_key,
-                  total_xp: user.total_xp,
-                  level: user.level,
-                  is_admin: user.is_admin || 0,
-                  email_verified: user.email_verified || 0,
-                  email_verification_expires: emailVerificationExpires
-                }
-              });
+              if (!res.headersSent) {
+                res.json({
+                  message: 'Login successful',
+                  token: token,
+                  user: {
+                    id: user.id,
+                    email: user.email,
+                    display_name: user.display_name,
+                    avatar_key: user.avatar_key,
+                    total_xp: user.total_xp,
+                    level: user.level,
+                    is_admin: user.is_admin || 0,
+                    email_verified: user.email_verified || 0,
+                    email_verification_expires: emailVerificationExpires
+                  }
+                });
+              }
             }
           );
         } else {
-          res.json({
-            message: 'Login successful',
-            token: token,
-            user: {
-              id: user.id,
-              email: user.email,
-              display_name: user.display_name,
-              avatar_key: user.avatar_key,
-              total_xp: user.total_xp,
-              level: user.level,
-              is_admin: user.is_admin || 0,
-              email_verified: user.email_verified || 0,
-              email_verification_expires: null
-            }
-          });
+          if (!res.headersSent) {
+            res.json({
+              message: 'Login successful',
+              token: token,
+              user: {
+                id: user.id,
+                email: user.email,
+                display_name: user.display_name,
+                avatar_key: user.avatar_key,
+                total_xp: user.total_xp,
+                level: user.level,
+                is_admin: user.is_admin || 0,
+                email_verified: user.email_verified || 0,
+                email_verification_expires: null
+              }
+            });
+          }
         }
       }
     );
