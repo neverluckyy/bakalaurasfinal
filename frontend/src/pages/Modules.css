@@ -170,9 +170,10 @@
   min-width: 40px;
 }
 
+.module-card .module-btn,
 .module-btn {
-  width: 100%;
-  display: flex;
+  width: 100% !important;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -180,6 +181,8 @@
   font-weight: 600;
   padding: 14px 24px;
   min-height: 48px; /* Better touch target */
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .btn-icon {
@@ -267,6 +270,7 @@
   }
   
   .module-btn {
+    width: 100% !important;
     padding: 12px 20px;
     font-size: 15px;
     min-height: 44px;

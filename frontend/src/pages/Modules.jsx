@@ -26,13 +26,6 @@ function Modules() {
     }
   };
 
-  const getModuleIcon = (moduleName) => {
-    if (moduleName.includes('Security Awareness')) return '🛡️';
-    if (moduleName.includes('Phishing')) return '🎣';
-    if (moduleName.includes('Business Email')) return '📧';
-    return '📚';
-  };
-
   const getModuleButtonIcon = (moduleName) => {
     if (moduleName.includes('Security Awareness')) {
       return <Shield className="btn-icon" />;
@@ -44,17 +37,6 @@ function Modules() {
       return <MailWarning className="btn-icon" />;
     }
     return <Shield className="btn-icon" />;
-  };
-
-  const getModuleColor = (index) => {
-    const colors = [
-      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-      'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-      'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
-    ];
-    return colors[index % colors.length];
   };
 
   if (loading) {
@@ -77,13 +59,6 @@ function Modules() {
       <div className="modules-grid">
         {Array.isArray(modules) && modules.map((module, index) => (
           <div key={module.id} className="module-card">
-            <div 
-              className="module-icon"
-              style={{ background: getModuleColor(index) }}
-            >
-              <span className="module-emoji">{getModuleIcon(module.display_name)}</span>
-            </div>
-            
             <div className="module-content">
               <h3>{module.display_name}</h3>
               <p className="module-description">

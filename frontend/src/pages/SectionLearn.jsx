@@ -327,6 +327,11 @@ const SectionLearn = () => {
               };
 
               lines.forEach((line, index) => {
+                // Skip Activity lines
+                if (line.includes('💡 Activity:') || line.includes('**💡 Activity:**') || line.match(/^\*\*.*Activity:.*\*\*/i)) {
+                  return; // Skip this line
+                }
+                
                 // Remove bullet point characters from the beginning of lines
                 const cleanLine = line.replace(/^[•\-*]\s*/, '');
                 

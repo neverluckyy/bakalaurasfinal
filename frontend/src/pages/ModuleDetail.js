@@ -268,20 +268,7 @@ const ModuleDetail = () => {
                 </div>
                 
                 <div className="section-actions">
-                  {section.learning_completed ? (
-                    <div className="retake-quiz-container">
-                      <Link
-                        to={`/sections/${section.id}/quiz`}
-                        className="btn btn-secondary retake-quiz-btn"
-                        title={section.quiz_attempted 
-                          ? "Re-take this quiz - you've already read the learning material and attempted the quiz"
-                          : "Take this quiz - you've completed the learning material"}
-                      >
-                        {section.quiz_attempted ? 'Retake Quiz' : 'Take Quiz'}
-                      </Link>
-                      <span className="retake-hint">Learning material completed</span>
-                    </div>
-                  ) : section.available ? (
+                  {section.available ? (
                     <div className="action-buttons">
                       <Link
                         to={`/sections/${section.id}/learn`}
@@ -289,6 +276,15 @@ const ModuleDetail = () => {
                       >
                         {sectionProgress[section.id] ? 'Continue Learning' : 'Start Learning'}
                       </Link>
+                      {(section.learning_completed || section.quiz_attempted) && (
+                        <Link
+                          to={`/sections/${section.id}/quiz`}
+                          className="btn btn-secondary"
+                          title="Restart this quiz - you've completed the learning material"
+                        >
+                          Restart Quiz
+                        </Link>
+                      )}
                     </div>
                   ) : (
                     <div className="locked-message">
