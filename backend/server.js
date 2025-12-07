@@ -132,6 +132,26 @@ async function startServer() {
     await initDatabase();
     console.log('Database initialized successfully');
     
+    // Optional: Auto-update learning content on startup
+    // Set AUTO_UPDATE_LEARNING_CONTENT=true in Railway environment variables to enable
+    if (process.env.AUTO_UPDATE_LEARNING_CONTENT === 'true') {
+      console.log('Auto-update enabled: Checking learning content...');
+      const { autoUpdate } = require('./scripts/auto-update-learning-content');
+      // Run asynchronously so it doesn't block server startup
+      autoUpdate()
+        .then(updated => {
+          if (updated) {
+            console.log('✅ Learning content auto-updated on startup');
+          } else {
+            console.log('ℹ️  Learning content is already up to date');
+          }
+        })
+        .catch(err => {
+          console.error('⚠️  Auto-update failed (non-fatal):', err.message);
+          // Don't crash the server if auto-update fails
+        });
+    }
+    
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
