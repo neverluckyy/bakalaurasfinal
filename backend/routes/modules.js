@@ -171,6 +171,30 @@ router.get('/', authenticateToken, async (req, res) => {
                 hasStarted = true;
               }
             }
+            
+            // Check if learning content is fully completed (all learning content items completed)
+            if (!hasStarted) {
+              const learningCompletedResult = await new Promise((resolve, reject) => {
+                db.get(
+                  `SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN ulp.completed = 1 THEN 1 ELSE 0 END) as completed
+                  FROM learning_content lc
+                  LEFT JOIN user_learning_progress ulp ON lc.id = ulp.learning_content_id AND ulp.user_id = ?
+                  WHERE lc.section_id = ?`,
+                  [userId, section.id],
+                  (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                  }
+                );
+              });
+              
+              if (learningCompletedResult && learningCompletedResult.total > 0 && 
+                  learningCompletedResult.completed === learningCompletedResult.total) {
+                hasStarted = true;
+              }
+            }
           }
         } catch (err) {
           console.error(`Error checking section ${section.id} completion:`, err);
@@ -306,6 +330,30 @@ router.get('/:moduleId', authenticateToken, async (req, res) => {
             });
             
             if (learningProgressResult && learningProgressResult.count > 0) {
+              hasStarted = true;
+            }
+          }
+          
+          // Check if learning content is fully completed (all learning content items completed)
+          if (!hasStarted) {
+            const learningCompletedResult = await new Promise((resolve, reject) => {
+              db.get(
+                `SELECT 
+                  COUNT(*) as total,
+                  SUM(CASE WHEN ulp.completed = 1 THEN 1 ELSE 0 END) as completed
+                FROM learning_content lc
+                LEFT JOIN user_learning_progress ulp ON lc.id = ulp.learning_content_id AND ulp.user_id = ?
+                WHERE lc.section_id = ?`,
+                [userId, section.id],
+                (err, row) => {
+                  if (err) reject(err);
+                  else resolve(row);
+                }
+              );
+            });
+            
+            if (learningCompletedResult && learningCompletedResult.total > 0 && 
+                learningCompletedResult.completed === learningCompletedResult.total) {
               hasStarted = true;
             }
           }

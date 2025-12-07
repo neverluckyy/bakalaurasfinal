@@ -265,14 +265,14 @@ const ModuleDetail = () => {
                       </Link>
                       <span className="retake-hint">No re-reading required</span>
                     </div>
-                  ) : (section.learning_completed && section.quiz_attempted && section.quiz_failed_or_stopped) ? (
+                  ) : (section.learning_completed && section.quiz_attempted) ? (
                     <div className="retake-quiz-container">
                       <Link
                         to={`/sections/${section.id}/quiz`}
                         className="btn btn-secondary retake-quiz-btn"
                         title="Re-take this quiz - you've already read the learning material and attempted the quiz"
                       >
-                        Re-take this Quiz
+                        Retake Quiz
                       </Link>
                       <span className="retake-hint">Learning material completed</span>
                     </div>
