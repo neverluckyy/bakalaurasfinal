@@ -259,7 +259,11 @@ function Home() {
               />
             </div>
             <div className="user-details">
-              <h1>Welcome back, {user.display_name}!</h1>
+              <h1>
+                {(user.total_xp === 0 && overallProgress === 0 && !hasStartedLearning) 
+                  ? `Welcome, ${user.display_name}!` 
+                  : `Welcome back, ${user.display_name}!`}
+              </h1>
               <p className="user-level">Level {user.level || 1} • {user.total_xp || 0} XP</p>
             </div>
           </div>
