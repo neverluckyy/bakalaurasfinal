@@ -10,9 +10,10 @@ const { generateToken, sendVerificationEmail, sendPasswordResetEmail } = require
 const router = express.Router();
 
 // More lenient rate limiting for /me endpoint (called frequently for auth checks)
+// Increased limit since this is a read-only operation and called on every page load
 const meLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 100 : 200, // More lenient for read-only auth checks
+  max: process.env.NODE_ENV === 'production' ? 500 : 1000, // Much more lenient for read-only auth checks
   message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false

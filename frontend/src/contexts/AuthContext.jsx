@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
@@ -11,11 +11,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     // Check if we have a token in localStorage
     const token = localStorage.getItem('authToken');
     if (!token) {
@@ -30,13 +26,24 @@ export function AuthProvider({ children }) {
       });
       setUser(response.data.user);
     } catch (error) {
+      // Handle rate limit errors (429) more gracefully
+      if (error.response?.status === 429) {
+        // Rate limited - don't clear token, just log and continue
+        console.warn('Rate limit reached for auth check. Please wait a moment.');
+        // Don't clear user data on rate limit - keep current user state
+        return;
+      }
       // Token might be invalid, clear it
       localStorage.removeItem('authToken');
       setUser(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const login = async (email, password) => {
     try {
@@ -53,6 +60,13 @@ export function AuthProvider({ children }) {
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
+      // Handle rate limit errors specifically
+      if (error.response?.status === 429) {
+        return { 
+          success: false, 
+          error: 'Too many login attempts. Please wait a moment and try again.'
+        };
+      }
       return { 
         success: false, 
         error: error.response?.data?.error || 'Login failed'

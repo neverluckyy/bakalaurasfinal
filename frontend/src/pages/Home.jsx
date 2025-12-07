@@ -24,9 +24,12 @@ function Home() {
 
   useEffect(() => {
     fetchModules();
-    // Refresh user data to get latest email verification status
-    checkAuth();
-  }, [checkAuth]);
+    // Only refresh user data if we need to check email verification status
+    // Don't call on every render to avoid rate limiting
+    if (user && !user.email_verified) {
+      checkAuth();
+    }
+  }, []); // Empty dependency array - only run once on mount
 
   useEffect(() => {
     // Check if email is not verified and calculate days remaining
