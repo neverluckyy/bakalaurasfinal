@@ -102,13 +102,75 @@ router.get('/', authenticateToken, async (req, res) => {
         );
       });
 
-      // Check completion for each section
+      // Check completion for each section and if module has been started
       let completedSections = 0;
+      let hasStarted = false;
+      
       for (const section of sections) {
         try {
           const isCompleted = await checkSectionCompletion(db, userId, section.id);
           if (isCompleted) {
             completedSections++;
+            hasStarted = true; // If any section is completed, module has been started
+          }
+          
+          // Check if section has been started (reading position > 0 or quiz draft exists)
+          if (!hasStarted) {
+            // Check reading position
+            const positionResult = await new Promise((resolve, reject) => {
+              db.get(
+                `SELECT last_step_index FROM section_reading_position 
+                 WHERE user_id = ? AND section_id = ?`,
+                [userId, section.id],
+                (err, row) => {
+                  if (err) reject(err);
+                  else resolve(row);
+                }
+              );
+            });
+            
+            if (positionResult && positionResult.last_step_index > 0) {
+              hasStarted = true;
+            }
+            
+            // Check quiz draft state if no reading position found
+            if (!hasStarted) {
+              const draftResult = await new Promise((resolve, reject) => {
+                db.get(
+                  `SELECT COUNT(*) as count FROM quiz_draft_state 
+                   WHERE user_id = ? AND section_id = ?`,
+                  [userId, section.id],
+                  (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                  }
+                );
+              });
+              
+              if (draftResult && draftResult.count > 0) {
+                hasStarted = true;
+              }
+            }
+            
+            // Check if user has any learning progress for this section
+            if (!hasStarted) {
+              const learningProgressResult = await new Promise((resolve, reject) => {
+                db.get(
+                  `SELECT COUNT(*) as count FROM user_learning_progress ulp
+                   JOIN learning_content lc ON ulp.learning_content_id = lc.id
+                   WHERE ulp.user_id = ? AND lc.section_id = ?`,
+                  [userId, section.id],
+                  (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                  }
+                );
+              });
+              
+              if (learningProgressResult && learningProgressResult.count > 0) {
+                hasStarted = true;
+              }
+            }
           }
         } catch (err) {
           console.error(`Error checking section ${section.id} completion:`, err);
@@ -121,7 +183,8 @@ router.get('/', authenticateToken, async (req, res) => {
         completed_sections: completedSections,
         completion_percentage: module.section_count > 0
           ? Math.round((completedSections / module.section_count) * 100)
-          : 0
+          : 0,
+        has_started: hasStarted
       };
     }));
 
@@ -177,13 +240,75 @@ router.get('/:moduleId', authenticateToken, async (req, res) => {
       );
     });
 
-    // Check completion for each section
+    // Check completion for each section and if module has been started
     let completedSections = 0;
+    let hasStarted = false;
+    
     for (const section of sections) {
       try {
         const isCompleted = await checkSectionCompletion(db, userId, section.id);
         if (isCompleted) {
           completedSections++;
+          hasStarted = true; // If any section is completed, module has been started
+        }
+        
+        // Check if section has been started (reading position > 0 or quiz draft exists)
+        if (!hasStarted) {
+          // Check reading position
+          const positionResult = await new Promise((resolve, reject) => {
+            db.get(
+              `SELECT last_step_index FROM section_reading_position 
+               WHERE user_id = ? AND section_id = ?`,
+              [userId, section.id],
+              (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+              }
+            );
+          });
+          
+          if (positionResult && positionResult.last_step_index > 0) {
+            hasStarted = true;
+          }
+          
+          // Check quiz draft state if no reading position found
+          if (!hasStarted) {
+            const draftResult = await new Promise((resolve, reject) => {
+              db.get(
+                `SELECT COUNT(*) as count FROM quiz_draft_state 
+                 WHERE user_id = ? AND section_id = ?`,
+                [userId, section.id],
+                (err, row) => {
+                  if (err) reject(err);
+                  else resolve(row);
+                }
+              );
+            });
+            
+            if (draftResult && draftResult.count > 0) {
+              hasStarted = true;
+            }
+          }
+          
+          // Check if user has any learning progress for this section
+          if (!hasStarted) {
+            const learningProgressResult = await new Promise((resolve, reject) => {
+              db.get(
+                `SELECT COUNT(*) as count FROM user_learning_progress ulp
+                 JOIN learning_content lc ON ulp.learning_content_id = lc.id
+                 WHERE ulp.user_id = ? AND lc.section_id = ?`,
+                [userId, section.id],
+                (err, row) => {
+                  if (err) reject(err);
+                  else resolve(row);
+                }
+              );
+            });
+            
+            if (learningProgressResult && learningProgressResult.count > 0) {
+              hasStarted = true;
+            }
+          }
         }
       } catch (err) {
         console.error(`Error checking section ${section.id} completion:`, err);
@@ -197,7 +322,8 @@ router.get('/:moduleId', authenticateToken, async (req, res) => {
       completed_sections: completedSections,
       completion_percentage: module.section_count > 0
         ? Math.round((completedSections / module.section_count) * 100)
-        : 0
+        : 0,
+      has_started: hasStarted
     };
 
     res.json(moduleWithProgress);
@@ -250,7 +376,7 @@ router.get('/:moduleId/sections', authenticateToken, async (req, res) => {
     });
 
     // Calculate completion and availability for each section using consistent logic
-    const sectionsWithProgress = await Promise.all(sections.map(async (section) => {
+    const sectionsWithProgress = await Promise.all(sections.map(async (section, index) => {
         // Use the same completion check function for consistency
         let isCompleted = false;
         try {
@@ -260,8 +386,77 @@ router.get('/:moduleId/sections', authenticateToken, async (req, res) => {
           isCompleted = false;
         }
         
-        // All sections are now available (section locking disabled)
-        const isAvailable = true;
+        // Store completion status for sequential locking check
+        const completionStatus = isCompleted;
+        
+        // Check if learning content is completed
+        let learningCompleted = false;
+        try {
+          const lcResult = await new Promise((resolve, reject) => {
+            db.get(
+              `SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN ulp.completed = 1 THEN 1 ELSE 0 END) as completed
+              FROM learning_content lc
+              LEFT JOIN user_learning_progress ulp ON lc.id = ulp.learning_content_id AND ulp.user_id = ?
+              WHERE lc.section_id = ?`,
+              [req.user.id, section.id],
+              (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+              }
+            );
+          });
+          learningCompleted = lcResult.total > 0 && lcResult.completed === lcResult.total;
+        } catch (err) {
+          learningCompleted = false;
+        }
+        
+        // Check if quiz has been attempted (answered questions or has draft state)
+        let quizAttempted = false;
+        let quizFailedOrStopped = false;
+        let hasDraftState = false;
+        
+        if (section.question_count > 0) {
+          // Check if user has answered any questions
+          quizAttempted = section.answered_questions > 0;
+          
+          // Check if quiz has draft state (stopped/incomplete)
+          try {
+            const draftResult = await new Promise((resolve, reject) => {
+              db.get(
+                `SELECT COUNT(*) as count 
+                FROM quiz_draft_state 
+                WHERE user_id = ? AND section_id = ?`,
+                [req.user.id, section.id],
+                (err, row) => {
+                  if (err) reject(err);
+                  else resolve(row);
+                }
+              );
+            });
+            if (draftResult && draftResult.count > 0) {
+              quizAttempted = true;
+              hasDraftState = true;
+            }
+          } catch (err) {
+            // Ignore errors
+          }
+          
+          // Check if quiz was failed (score < 70%) or stopped
+          if (quizAttempted) {
+            const quizScore = section.question_count > 0 
+              ? (section.correct_answers / section.question_count) * 100
+              : 0;
+            const quizPassed = quizScore >= 70;
+            
+            // Quiz failed if score < 70%, or stopped if draft exists (incomplete attempt)
+            // Note: If quiz was completed and passed, isCompleted will be true and quizPassed will be true
+            if (!quizPassed || hasDraftState) {
+              quizFailedOrStopped = true;
+            }
+          }
+        }
         
         // Calculate quiz accuracy if quiz exists
         const quizAccuracy = section.question_count > 0 
@@ -301,17 +496,39 @@ router.get('/:moduleId/sections', authenticateToken, async (req, res) => {
         
         return {
           ...section,
-          completed: isCompleted,
-          available: isAvailable,
-          learned: section.answered_questions > 0 || isCompleted, // Mark as learned if user has answered questions or completed
+          completed: completionStatus,
+          sectionIndex: index, // Store index for sequential locking
+          learned: section.answered_questions > 0 || completionStatus, // Mark as learned if user has answered questions or completed
           completion_percentage: completionPercentage,
           accuracy_percentage: section.answered_questions > 0 
             ? Math.round((section.correct_answers / section.answered_questions) * 100)
-            : 0
+            : 0,
+          learning_completed: learningCompleted,
+          quiz_attempted: quizAttempted,
+          quiz_failed_or_stopped: quizFailedOrStopped
         };
       }));
+    
+    // Apply sequential locking: first section is always available, others require previous section to be completed
+    const sectionsWithLocking = sectionsWithProgress.map((section, index) => {
+      let isAvailable = false;
+      
+      if (index === 0) {
+        // First section is always available
+        isAvailable = true;
+      } else {
+        // Section is available if previous section is completed
+        const previousSection = sectionsWithProgress[index - 1];
+        isAvailable = previousSection.completed === true;
+      }
+      
+      return {
+        ...section,
+        available: isAvailable
+      };
+    });
 
-    res.json(sectionsWithProgress);
+    res.json(sectionsWithLocking);
   } catch (error) {
     console.error('Database error:', error);
     res.status(500).json({ error: 'Database error' });

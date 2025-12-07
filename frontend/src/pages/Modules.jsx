@@ -112,9 +112,9 @@ function Modules() {
                 <Play className="btn-icon" />
                 {module.completion_percentage === 100 
                   ? 'Review' 
-                  : (module.completion_percentage === 0 && module.completed_sections === 0) 
-                    ? 'Start Learning' 
-                    : 'Continue'}
+                  : module.has_started 
+                    ? 'Continue Learning' 
+                    : 'Start Learning'}
               </Link>
             </div>
           </div>

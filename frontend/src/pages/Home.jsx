@@ -338,7 +338,7 @@ function Home() {
                 <p>{module.completed_sections} of {module.section_count} sections completed</p>
               </div>
               <Link to={`/modules/${module.id}`} className="btn btn-secondary">
-                {(module.completion_percentage === 0 && module.completed_sections === 0) ? 'Start Learning' : 'Continue'}
+                {module.has_started ? 'Continue Learning' : 'Start Learning'}
               </Link>
             </div>
           ))}
