@@ -269,18 +269,7 @@ const ModuleDetail = () => {
                 </div>
                 
                 <div className="section-actions">
-                  {section.completed ? (
-                    <div className="retake-quiz-container">
-                      <Link
-                        to={`/sections/${section.id}/quiz`}
-                        className="btn btn-secondary retake-quiz-btn"
-                        title="Retake this quiz without re-reading the learning material"
-                      >
-                        Retake Quiz
-                      </Link>
-                      <span className="retake-hint">No re-reading required</span>
-                    </div>
-                  ) : section.learning_completed ? (
+                  {section.learning_completed ? (
                     <div className="retake-quiz-container">
                       <Link
                         to={`/sections/${section.id}/quiz`}
