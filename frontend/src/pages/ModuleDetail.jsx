@@ -37,19 +37,25 @@ const ModuleDetail = () => {
       for (const section of uniqueSections) {
         let hasProgress = false;
         
-        // Check if learning is completed (from API)
+        // Check if learning is completed (from API) - definitely started
         if (section.learning_completed) {
           hasProgress = true;
         }
         
+        // Check if quiz has been attempted (from API) - definitely started
+        if (!hasProgress && section.quiz_attempted) {
+          hasProgress = true;
+        }
+        
         // Check localStorage for reading position (faster check)
+        // Consider it started if stepIndex > 0 (they've progressed past the first step)
         if (!hasProgress) {
           try {
             const positionKey = `reading_position_${section.id}`;
             const positionData = localStorage.getItem(positionKey);
             if (positionData) {
               const parsed = JSON.parse(positionData);
-              // Consider it started if stepIndex > 0 (they've progressed past the first step)
+              // Consider it started if they've progressed past the first step
               if (parsed.stepIndex !== undefined && parsed.stepIndex > 0) {
                 hasProgress = true;
               }
@@ -63,11 +69,25 @@ const ModuleDetail = () => {
         if (!hasProgress) {
           try {
             const positionResponse = await axios.get(`/api/learning-content/section/${section.id}/position`);
+            // Consider it started if they've progressed past the first step
             if (positionResponse.data && positionResponse.data.stepIndex !== undefined && positionResponse.data.stepIndex > 0) {
               hasProgress = true;
             }
           } catch (apiErr) {
-            // Ignore errors - section might not have a saved position yet
+            // If 404 or no position, they haven't started - this is fine
+          }
+        }
+        
+        // Check if there's any learning progress in the database
+        if (!hasProgress) {
+          try {
+            const progressResponse = await axios.get(`/api/learning-content/section/${section.id}/progress`);
+            if (progressResponse.data && progressResponse.data.completedCount > 0) {
+              // If any learning content items are completed, they've started
+              hasProgress = true;
+            }
+          } catch (apiErr) {
+            // Ignore errors - section might not have learning content
           }
         }
         
@@ -85,11 +105,6 @@ const ModuleDetail = () => {
           } catch (storageErr) {
             // Ignore errors
           }
-        }
-        
-        // Check if quiz has been attempted (from API)
-        if (!hasProgress && section.quiz_attempted) {
-          hasProgress = true;
         }
         
         progressMap[section.id] = hasProgress;
@@ -265,33 +280,18 @@ const ModuleDetail = () => {
                       </Link>
                       <span className="retake-hint">No re-reading required</span>
                     </div>
-                  ) : (section.learning_completed && section.quiz_attempted) ? (
+                  ) : section.learning_completed ? (
                     <div className="retake-quiz-container">
                       <Link
                         to={`/sections/${section.id}/quiz`}
                         className="btn btn-secondary retake-quiz-btn"
-                        title="Re-take this quiz - you've already read the learning material and attempted the quiz"
+                        title={section.quiz_attempted 
+                          ? "Re-take this quiz - you've already read the learning material and attempted the quiz"
+                          : "Take this quiz - you've completed the learning material"}
                       >
-                        Retake Quiz
+                        {section.quiz_attempted ? 'Retake Quiz' : 'Take Quiz'}
                       </Link>
                       <span className="retake-hint">Learning material completed</span>
-                    </div>
-                  ) : section.learning_completed && !section.completed ? (
-                    <div className="action-buttons">
-                      <Link
-                        to={`/sections/${section.id}/quiz`}
-                        className="btn btn-primary"
-                        title="Take the quiz to test your knowledge"
-                      >
-                        Take a Quiz
-                      </Link>
-                      <Link
-                        to={`/sections/${section.id}/learn`}
-                        className="btn btn-secondary"
-                        title="Review the learning material"
-                      >
-                        Review Learning
-                      </Link>
                     </div>
                   ) : section.available ? (
                     <div className="action-buttons">

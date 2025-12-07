@@ -83,11 +83,20 @@ function Home() {
       setOverallProgress(progress);
       
       // Check if user has started any learning (has any progress)
-      // User has started if: 
-      // 1. completed_sections > 0 OR any module has completion_percentage > 0
-      // 2. OR has saved reading positions or quiz drafts in localStorage
-      let hasProgress = completedSections > 0 || 
-                       modulesData.some(module => (module.completion_percentage || 0) > 0);
+      // User has started if any module has has_started flag set to true
+      // This flag is set by the backend when user has:
+      // - Completed sections, OR
+      // - Reading positions > 0, OR
+      // - Quiz drafts, OR
+      // - Learning progress entries, OR
+      // - Completed learning content
+      let hasProgress = modulesData.some(module => module.has_started === true);
+      
+      // Fallback: Also check for completed sections or completion percentage
+      if (!hasProgress) {
+        hasProgress = completedSections > 0 || 
+                     modulesData.some(module => (module.completion_percentage || 0) > 0);
+      }
       
       // Also check localStorage for in-progress learning (reading positions or quiz drafts)
       if (!hasProgress) {
@@ -280,18 +289,10 @@ function Home() {
       <div className="quick-actions">
         <h2>Quick Actions</h2>
         <div className="action-grid">
-          {hasStartedLearning && (
-            <Link to="/modules" className="action-card">
-              <BookOpen className="action-icon" />
-              <h3>Continue Learning</h3>
-              <p>Pick up where you left off</p>
-            </Link>
-          )}
-          
           <Link to="/modules" className="action-card">
             <BookOpen className="action-icon" />
-            <h3>{hasStartedLearning ? 'Browse Modules' : 'Start Learning'}</h3>
-            <p>{hasStartedLearning ? 'Explore all available modules' : 'Begin your learning journey'}</p>
+            <h3>{hasStartedLearning ? 'Continue Learning' : 'Start Learning'}</h3>
+            <p>{hasStartedLearning ? 'Pick up where you left off' : 'Begin your learning journey'}</p>
           </Link>
           
           <Link to="/leaderboard" className="action-card">

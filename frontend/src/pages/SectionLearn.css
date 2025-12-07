@@ -153,6 +153,47 @@
   font-weight: 600;
 }
 
+.content-body h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #6A5ACD;
+}
+
+.content-body h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.content-body .citation-link {
+  color: #8A7ACD;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+  font-weight: 500;
+}
+
+.content-body .citation-link:hover {
+  color: #6A5ACD;
+  text-decoration: none;
+}
+
+.content-body a {
+  color: #8A7ACD;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+}
+
+.content-body a:hover {
+  color: #6A5ACD;
+  text-decoration: none;
+}
+
 .phishing-image-container {
   margin: 2rem 0;
   text-align: center;

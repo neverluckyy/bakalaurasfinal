@@ -292,6 +292,40 @@ const SectionLearn = () => {
               const lines = currentContent.content_markdown.split('\n');
               const elements = [];
 
+              // Helper function to parse markdown links in text
+              const parseMarkdownLinks = (text) => {
+                const parts = [];
+                let lastIndex = 0;
+                // Match markdown links: [text](url)
+                const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+                let match;
+
+                while ((match = linkRegex.exec(text)) !== null) {
+                  // Add text before the link
+                  if (match.index > lastIndex) {
+                    parts.push(text.substring(lastIndex, match.index));
+                  }
+                  // Add the link
+                  parts.push(
+                    <a 
+                      key={match.index}
+                      href={match[2]} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="citation-link"
+                    >
+                      {match[1]}
+                    </a>
+                  );
+                  lastIndex = match.index + match[0].length;
+                }
+                // Add remaining text
+                if (lastIndex < text.length) {
+                  parts.push(text.substring(lastIndex));
+                }
+                return parts.length > 0 ? parts : [text];
+              };
+
               lines.forEach((line, index) => {
                 // Remove bullet point characters from the beginning of lines
                 const cleanLine = line.replace(/^[•\-*]\s*/, '');
@@ -317,16 +351,37 @@ const SectionLearn = () => {
                       )}
                     </div>
                   );
-                } else if (cleanLine.startsWith('**') && cleanLine.endsWith('**')) {
+                } else if (cleanLine.startsWith('##')) {
+                  // Heading level 2
+                  elements.push(
+                    <h2 key={index} className="content-heading">
+                      {parseMarkdownLinks(cleanLine.replace(/^##\s*/, ''))}
+                    </h2>
+                  );
+                } else if (cleanLine.startsWith('###')) {
+                  // Heading level 3
+                  elements.push(
+                    <h3 key={index} className="content-subheading">
+                      {parseMarkdownLinks(cleanLine.replace(/^###\s*/, ''))}
+                    </h3>
+                  );
+                } else if (cleanLine.startsWith('**') && cleanLine.endsWith('**') && cleanLine.length > 4) {
+                  // Bold text (entire line)
+                  const boldText = cleanLine.slice(2, -2);
                   elements.push(
                     <strong key={index}>
-                      {cleanLine.slice(2, -2)}
+                      {parseMarkdownLinks(boldText)}
                     </strong>
                   );
                 } else if (cleanLine.trim() === '') {
                   elements.push(<br key={index} />);
                 } else {
-                  elements.push(<p key={index}>{cleanLine}</p>);
+                  // Regular paragraph with potential markdown links
+                  elements.push(
+                    <p key={index}>
+                      {parseMarkdownLinks(cleanLine)}
+                    </p>
+                  );
                 }
               });
 
