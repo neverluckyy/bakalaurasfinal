@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, CheckCircle, Play } from 'lucide-react';
+import { BookOpen, CheckCircle, Shield, ShieldAlert, MailWarning } from 'lucide-react';
 import axios from 'axios';
 import './Modules.css';
 
@@ -31,6 +31,19 @@ function Modules() {
     if (moduleName.includes('Phishing')) return '🎣';
     if (moduleName.includes('Business Email')) return '📧';
     return '📚';
+  };
+
+  const getModuleButtonIcon = (moduleName) => {
+    if (moduleName.includes('Security Awareness')) {
+      return <Shield className="btn-icon" />;
+    }
+    if (moduleName.includes('Phishing')) {
+      return <ShieldAlert className="btn-icon" />;
+    }
+    if (moduleName.includes('Business Email')) {
+      return <MailWarning className="btn-icon" />;
+    }
+    return <Shield className="btn-icon" />;
   };
 
   const getModuleColor = (index) => {
@@ -109,7 +122,7 @@ function Modules() {
                 to={`/modules/${module.id}`} 
                 className="btn btn-primary module-btn"
               >
-                <Play className="btn-icon" />
+                {getModuleButtonIcon(module.display_name)}
                 {module.completion_percentage === 100 
                   ? 'Review' 
                   : module.has_started 

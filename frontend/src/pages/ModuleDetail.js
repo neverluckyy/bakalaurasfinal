@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 
-import { BookOpen, Play, CheckCircle, Info } from 'lucide-react';
+import { BookOpen, Shield, ShieldCheck, Lock, CheckCircle, Info } from 'lucide-react';
 import axios from 'axios';
 import './ModuleDetail.css';
 
@@ -31,25 +31,49 @@ const ModuleDetail = () => {
       
       setSections(uniqueSections);
       
-      // Check for saved progress for each section (check localStorage first for speed)
+      // Check for saved progress for each section
+      // Use section data from API which already includes learning_completed and other flags
       const progressMap = {};
       for (const section of uniqueSections) {
         let hasProgress = false;
         
-        // Check localStorage first (faster, no API call needed)
-        try {
-          // Check reading position
-          const positionKey = `reading_position_${section.id}`;
-          const positionData = localStorage.getItem(positionKey);
-          if (positionData) {
-            const parsed = JSON.parse(positionData);
-            if (parsed.stepIndex > 0) {
+        // Check if learning is completed (from API)
+        if (section.learning_completed) {
+          hasProgress = true;
+        }
+        
+        // Check localStorage for reading position (faster check)
+        if (!hasProgress) {
+          try {
+            const positionKey = `reading_position_${section.id}`;
+            const positionData = localStorage.getItem(positionKey);
+            if (positionData) {
+              const parsed = JSON.parse(positionData);
+              // Consider it started if stepIndex > 0 (they've progressed past the first step)
+              if (parsed.stepIndex !== undefined && parsed.stepIndex > 0) {
+                hasProgress = true;
+              }
+            }
+          } catch (storageErr) {
+            // Ignore localStorage errors
+          }
+        }
+        
+        // Check API for reading position if not found in localStorage
+        if (!hasProgress) {
+          try {
+            const positionResponse = await axios.get(`/api/learning-content/section/${section.id}/position`);
+            if (positionResponse.data && positionResponse.data.stepIndex !== undefined && positionResponse.data.stepIndex > 0) {
               hasProgress = true;
             }
+          } catch (apiErr) {
+            // Ignore errors - section might not have a saved position yet
           }
-          
-          // Check quiz draft state if no reading position found
-          if (!hasProgress) {
+        }
+        
+        // Check quiz draft state
+        if (!hasProgress) {
+          try {
             const quizKey = `quiz_draft_${section.id}`;
             const quizData = localStorage.getItem(quizKey);
             if (quizData) {
@@ -58,17 +82,14 @@ const ModuleDetail = () => {
                 hasProgress = true;
               }
             }
-          }
-        } catch (storageErr) {
-          // If localStorage check fails, try API as fallback
-          try {
-            const positionResponse = await axios.get(`/api/learning-content/section/${section.id}/position`);
-            if (positionResponse.data.stepIndex > 0) {
-              hasProgress = true;
-            }
-          } catch (apiErr) {
+          } catch (storageErr) {
             // Ignore errors
           }
+        }
+        
+        // Check if quiz has been attempted (from API)
+        if (!hasProgress && section.quiz_attempted) {
+          hasProgress = true;
         }
         
         progressMap[section.id] = hasProgress;
@@ -113,8 +134,9 @@ const ModuleDetail = () => {
   }
 
   const getSectionIcon = (section) => {
-    if (section.completed) return <CheckCircle className="section-icon completed" />;
-    return <Play className="section-icon available" />;
+    if (section.completed) return <ShieldCheck className="section-icon completed" />;
+    if (section.available) return <Shield className="section-icon available" />;
+    return <Lock className="section-icon locked" />;
   };
 
   const getSectionStatus = (section) => {
@@ -241,6 +263,34 @@ const ModuleDetail = () => {
                         Retake Quiz
                       </Link>
                       <span className="retake-hint">No re-reading required</span>
+                    </div>
+                  ) : (section.learning_completed && section.quiz_attempted && section.quiz_failed_or_stopped) ? (
+                    <div className="retake-quiz-container">
+                      <Link
+                        to={`/sections/${section.id}/quiz`}
+                        className="btn btn-secondary retake-quiz-btn"
+                        title="Re-take this quiz - you've already read the learning material and attempted the quiz"
+                      >
+                        Re-take this Quiz
+                      </Link>
+                      <span className="retake-hint">Learning material completed</span>
+                    </div>
+                  ) : section.learning_completed && !section.completed ? (
+                    <div className="action-buttons">
+                      <Link
+                        to={`/sections/${section.id}/quiz`}
+                        className="btn btn-primary"
+                        title="Take the quiz to test your knowledge"
+                      >
+                        Take a Quiz
+                      </Link>
+                      <Link
+                        to={`/sections/${section.id}/learn`}
+                        className="btn btn-secondary"
+                        title="Review the learning material"
+                      >
+                        Review Learning
+                      </Link>
                     </div>
                   ) : section.available ? (
                     <div className="action-buttons">

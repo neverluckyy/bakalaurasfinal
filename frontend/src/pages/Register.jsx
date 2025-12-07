@@ -117,6 +117,13 @@ function Register() {
       return;
     }
 
+    // Ensure selectedAvatar is passed correctly
+    if (!selectedAvatar) {
+      setError('Please select an avatar');
+      setLoading(false);
+      return;
+    }
+    
     const result = await register(email, password, displayName, selectedAvatar);
     
     if (result.success) {

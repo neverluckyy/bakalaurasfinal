@@ -86,10 +86,16 @@ router.post('/register', async (req, res) => {
 
       const finalDisplayName = display_name || email.split('@')[0];
 
+      // Validate and set avatar_key - only default if truly missing
+      const validAvatars = ['robot_coral', 'robot_gold', 'robot_lavender', 'robot_mint', 'robot_sky'];
+      const finalAvatarKey = (avatar_key && validAvatars.includes(avatar_key)) 
+        ? avatar_key 
+        : 'robot_coral';
+
       // Create user (email_verified defaults to 0/false)
       db.run(
         'INSERT INTO users (email, password_hash, display_name, avatar_key, terms_version, privacy_version, consent_timestamp, email_verified, email_verification_token, email_verification_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [email, passwordHash, finalDisplayName, avatar_key || 'robot_coral', termsVersion, privacyVersion, consentTimestamp, 0, verificationToken, verificationExpires.toISOString()],
+        [email, passwordHash, finalDisplayName, finalAvatarKey, termsVersion, privacyVersion, consentTimestamp, 0, verificationToken, verificationExpires.toISOString()],
         async function(err) {
           if (err) {
             return res.status(500).json({ error: 'Failed to create user' });
@@ -129,7 +135,7 @@ router.post('/register', async (req, res) => {
               id: userId,
               email,
               display_name: finalDisplayName,
-              avatar_key: avatar_key || 'robot_coral',
+              avatar_key: finalAvatarKey,
               total_xp: 0,
               level: 1,
               email_verified: false,

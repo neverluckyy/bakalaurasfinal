@@ -215,6 +215,9 @@ router.put('/profile', authenticateToken, async (req, res) => {
     const db = getDatabase();
     const userId = req.user.id;
     const { display_name, email, avatar_key } = req.body;
+    
+    // Validate avatar_key if provided
+    const validAvatars = ['robot_coral', 'robot_gold', 'robot_lavender', 'robot_mint', 'robot_sky'];
 
     // Validate input
     if (!display_name || !email) {
@@ -234,7 +237,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 
     // Get current user data
-    db.get('SELECT email, display_name FROM users WHERE id = ?', [userId], async (err, currentUser) => {
+    db.get('SELECT email, display_name, avatar_key FROM users WHERE id = ?', [userId], async (err, currentUser) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Database error' });
@@ -243,6 +246,11 @@ router.put('/profile', authenticateToken, async (req, res) => {
       if (!currentUser) {
         return res.status(404).json({ error: 'User not found' });
       }
+
+      // Validate and set avatar_key - use provided one if valid, otherwise keep existing
+      const finalAvatarKey = (avatar_key && validAvatars.includes(avatar_key)) 
+        ? avatar_key 
+        : (currentUser.avatar_key || 'robot_coral');
 
       const emailChanged = email !== currentUser.email;
 
@@ -269,7 +277,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
           // Store new email and verification token (don't update email yet)
           db.run(
             'UPDATE users SET display_name = ?, avatar_key = ?, new_email = ?, new_email_verification_token = ?, new_email_verification_expires = ? WHERE id = ?',
-            [display_name, avatar_key || 'robot_coral', email, verificationToken, verificationExpires.toISOString(), userId],
+            [display_name, finalAvatarKey, email, verificationToken, verificationExpires.toISOString(), userId],
             async function(err) {
               if (err) {
                 console.error('Database error:', err);
@@ -308,7 +316,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
           WHERE id = ?
         `;
 
-        db.run(updateQuery, [display_name, avatar_key || 'robot_coral', userId], function(err) {
+        db.run(updateQuery, [display_name, finalAvatarKey, userId], function(err) {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to update profile' });
