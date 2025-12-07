@@ -29,7 +29,7 @@ function Home() {
     if (user && !user.email_verified) {
       checkAuth();
     }
-  }, []); // Empty dependency array - only run once on mount
+  }, [user, checkAuth]); // Include dependencies to satisfy ESLint
 
   useEffect(() => {
     // Check if email is not verified and calculate days remaining
