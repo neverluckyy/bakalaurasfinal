@@ -14,6 +14,7 @@ router.get('/:sectionId', authenticateToken, (req, res) => {
       s.id,
       s.name,
       s.display_name,
+      s.display_name as title,
       s.description,
       s.order_index,
       s.module_id,
