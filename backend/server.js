@@ -15,6 +15,7 @@ const sectionRoutes = require('./routes/sections');
 const learningContentRoutes = require('./routes/learning-content');
 const adminRoutes = require('./routes/admin');
 const supportRoutes = require('./routes/support');
+const maintenanceRoutes = require('./routes/maintenance');
 const { initDatabase } = require('./database/init');
 
 const app = express();
@@ -116,6 +117,7 @@ app.use('/api/sections', sectionRoutes);
 app.use('/api/learning-content', learningContentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
