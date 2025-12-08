@@ -164,11 +164,15 @@ You'll learn about:
               }
 
               // Find all content that should be deleted (everything after Introduction that's not "Real World Examples")
+              // This includes "Key Concepts" if it exists, and any other concept pages
               const conceptsToDelete = allContent.filter(c => 
                 c.order_index > introduction.order_index && 
                 c.screen_title !== 'Real World Examples' &&
-                !c.screen_title.toLowerCase().includes('example')
+                !c.screen_title.toLowerCase().includes('example') &&
+                c.screen_title !== 'Introduction'
               );
+              
+              console.log('Content to delete:', conceptsToDelete.map(c => `${c.screen_title} (order: ${c.order_index})`));
 
               if (conceptsToDelete.length === 0) {
                 console.log('No existing concept pages to delete');
@@ -246,23 +250,26 @@ You'll learn about:
               }
 
               function deleteAndInsert() {
-                // Delete old concept pages
+                // Delete old concept pages by ID (more reliable than screen_title)
                 if (conceptsToDelete.length > 0) {
-                  const screenTitles = conceptsToDelete.map(c => c.screen_title);
+                  const contentIds = conceptsToDelete.map(c => c.id);
+                  console.log(`Deleting ${contentIds.length} content items by ID:`, contentIds);
+                  
                   db.run(
-                    `DELETE FROM learning_content WHERE section_id = ? AND screen_title IN (${screenTitles.map(() => '?').join(',')})`,
-                    [sectionId, ...screenTitles],
-                    (err) => {
+                    `DELETE FROM learning_content WHERE id IN (${contentIds.map(() => '?').join(',')})`,
+                    contentIds,
+                    function(err) {
                       if (err) {
                         console.error('Error deleting concepts:', err);
                         reject(err);
                         return;
                       }
-                      console.log(`✓ Deleted ${conceptsToDelete.length} old concept pages`);
+                      console.log(`✓ Deleted ${this.changes} old concept pages`);
                       insertConcepts();
                     }
                   );
                 } else {
+                  console.log('No existing concept pages to delete, proceeding with insertion');
                   insertConcepts();
                 }
               }
