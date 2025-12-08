@@ -91,34 +91,38 @@ function formatContent(row) {
 }
 
 /**
- * Check if content needs updating by checking if Introduction exists and has old content
+ * Check if content needs updating by checking:
+ * 1. If Introduction has references (should not)
+ * 2. If we have 8 separate concept pages (not 1 combined "Key Concepts")
  */
 function needsUpdate(db, sectionId) {
   return new Promise((resolve, reject) => {
+    // Get Introduction
     db.get(
-      'SELECT content_markdown FROM learning_content WHERE section_id = ? AND screen_title = ?',
+      'SELECT content_markdown, order_index FROM learning_content WHERE section_id = ? AND screen_title = ?',
       [sectionId, 'Introduction'],
-      (err, row) => {
+      (err, introRow) => {
         if (err) {
           reject(err);
           return;
         }
         
-        if (!row) {
+        if (!introRow) {
           // No Introduction found - needs update
+          console.log('[Auto-Update] Update needed: Introduction not found');
           resolve(true);
           return;
         }
         
         // Check if Introduction has references (should not have them)
-        const hasReferences = row.content_markdown.includes('References:') || 
-                             row.content_markdown.includes('## References') ||
-                             row.content_markdown.includes('formatReferences');
+        const hasReferences = introRow.content_markdown.includes('References:') || 
+                             introRow.content_markdown.includes('## References') ||
+                             introRow.content_markdown.includes('formatReferences');
         
         // Check if we have separate concept pages (should have 8, not 1 combined "Key Concepts")
         db.all(
           'SELECT screen_title FROM learning_content WHERE section_id = ? AND order_index > ? ORDER BY order_index',
-          [sectionId, row.order_index || 1],
+          [sectionId, introRow.order_index || 1],
           (err, conceptPages) => {
             if (err) {
               reject(err);
@@ -130,13 +134,19 @@ function needsUpdate(db, sectionId) {
               !c.screen_title.toLowerCase().includes('example')
             );
             
+            // Check if we have a combined "Key Concepts" page (bad) or separate pages (good)
+            const hasKeyConceptsPage = actualConcepts.some(c => 
+              c.screen_title === 'Key Concepts'
+            );
+            
             // Needs update if:
             // 1. Introduction has references, OR
-            // 2. We don't have 8 separate concept pages (might have 1 combined "Key Concepts" or wrong number)
-            const needsUpdate = hasReferences || actualConcepts.length !== 8;
+            // 2. We have a combined "Key Concepts" page (should be split), OR
+            // 3. We don't have exactly 8 separate concept pages
+            const needsUpdate = hasReferences || hasKeyConceptsPage || actualConcepts.length !== 8;
             
             if (needsUpdate) {
-              console.log(`[Auto-Update] Update needed: hasReferences=${hasReferences}, conceptPages=${actualConcepts.length} (expected 8)`);
+              console.log(`[Auto-Update] Update needed: hasReferences=${hasReferences}, hasKeyConceptsPage=${hasKeyConceptsPage}, conceptPages=${actualConcepts.length} (expected 8)`);
             }
             
             resolve(needsUpdate);
