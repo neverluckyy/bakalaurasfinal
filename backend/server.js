@@ -86,6 +86,22 @@ app.use('/avatars', express.static(path.join(__dirname, '../frontend/public/avat
 app.use('/phishing-examples', express.static(path.join(__dirname, '../frontend/public/phishing-examples')));
 
 // Routes
+// Root endpoint - helpful info
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Backend API is running!',
+    endpoints: {
+      health: '/api/health',
+      test: '/api/test',
+      auth: '/api/auth/*',
+      modules: '/api/modules/*',
+      sections: '/api/sections/*',
+      learningContent: '/api/learning-content/*'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Test endpoint to verify routes are loading
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Routes are working!', timestamp: new Date().toISOString() });
