@@ -110,12 +110,38 @@ function needsUpdate(db, sectionId) {
           return;
         }
         
-        // Check if it's the old version (contains "Social engineering is the art of tricking")
-        const isOldVersion = row.content_markdown.includes('Social engineering is the art of tricking people to bypass security');
-        const isNewVersion = row.content_markdown.includes('Welcome to the **Phishing and Social Engineering** section!');
+        // Check if Introduction has references (should not have them)
+        const hasReferences = row.content_markdown.includes('References:') || 
+                             row.content_markdown.includes('## References') ||
+                             row.content_markdown.includes('formatReferences');
         
-        // Needs update if it's old version or not new version
-        resolve(isOldVersion || !isNewVersion);
+        // Check if we have separate concept pages (should have 8, not 1 combined "Key Concepts")
+        db.all(
+          'SELECT screen_title FROM learning_content WHERE section_id = ? AND order_index > ? ORDER BY order_index',
+          [sectionId, row.order_index || 1],
+          (err, conceptPages) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+            
+            // Filter out "Real World Examples" and similar
+            const actualConcepts = conceptPages.filter(c => 
+              !c.screen_title.toLowerCase().includes('example')
+            );
+            
+            // Needs update if:
+            // 1. Introduction has references, OR
+            // 2. We don't have 8 separate concept pages (might have 1 combined "Key Concepts" or wrong number)
+            const needsUpdate = hasReferences || actualConcepts.length !== 8;
+            
+            if (needsUpdate) {
+              console.log(`[Auto-Update] Update needed: hasReferences=${hasReferences}, conceptPages=${actualConcepts.length} (expected 8)`);
+            }
+            
+            resolve(needsUpdate);
+          }
+        );
       }
     );
   });
@@ -196,11 +222,7 @@ async function autoUpdate() {
                   return;
                 }
                 
-                // Build new content
-                const firstRow = csvData[0];
-                const firstRowTopic = firstRow['Topic'] || firstRow.Topic;
-                const firstRowReferences = firstRow['References'] || firstRow.References || '';
-                
+                // Build Introduction WITHOUT references
                 const introductionContent = `Welcome to the **Phishing and Social Engineering** section!
 
 This section will help you understand how attackers use psychological manipulation to trick people into revealing sensitive information or taking actions that compromise security.
@@ -209,28 +231,9 @@ You'll learn about:
 • What social engineering is and how it works
 • Different types of social engineering attacks (phishing, vishing, smishing, pretexting, baiting, tailgating)
 • The psychological tactics attackers use
-• How to recognize and respond to these threats safely
-
-${formatReferences(firstRowReferences)}`;
+• How to recognize and respond to these threats safely`;
                 
-                let keyConceptsContent = `## ${firstRowTopic}\n\n`;
-                keyConceptsContent += formatContent(firstRow);
-                
-                if (csvData.length > 1) {
-                  keyConceptsContent += '\n\n## Types of Social Engineering Attacks\n\n';
-                  for (let i = 1; i < csvData.length; i++) {
-                    const row = csvData[i];
-                    const topic = row['Topic'] || row.Topic;
-                    const teachingMaterial = row['Teaching_Material'] || row.Teaching_Material;
-                    if (topic && teachingMaterial) {
-                      keyConceptsContent += `### ${topic}\n\n`;
-                      keyConceptsContent += formatContent(row);
-                      keyConceptsContent += '\n\n';
-                    }
-                  }
-                }
-                
-                // Insert Introduction
+                // Insert Introduction (without references)
                 db.run(
                   'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
                   [sectionId, 'Introduction', 2, introductionContent, 1],
@@ -241,21 +244,47 @@ ${formatReferences(firstRowReferences)}`;
                       return;
                     }
                     
-                    // Insert Key Concepts
-                    db.run(
-                      'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
-                      [sectionId, 'Key Concepts', 10, keyConceptsContent, 2],
-                      function(err) {
-                        if (err) {
-                          console.error('[Auto-Update] Error inserting Key Concepts:', err);
-                          reject(err);
-                          return;
-                        }
-                        
+                    console.log('[Auto-Update] ✓ Inserted Introduction (without references)');
+                    
+                    // Insert individual concept pages (one per concept)
+                    let currentOrderIndex = 2;
+                    let insertCount = 0;
+                    
+                    function insertNextConcept(index) {
+                      if (index >= csvData.length) {
+                        console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
                         console.log('[Auto-Update] ✅ Learning content updated successfully!');
                         resolve(true);
+                        return;
                       }
-                    );
+                      
+                      const row = csvData[index];
+                      const topic = row['Topic'] || row.Topic;
+                      const conceptContent = formatContent(row);
+                      
+                      const wordCount = conceptContent.split(/\s+/).length;
+                      const readTime = Math.max(1, Math.ceil(wordCount / 200));
+                      
+                      db.run(
+                        'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
+                        [sectionId, topic, readTime, conceptContent, currentOrderIndex],
+                        function(err) {
+                          if (err) {
+                            console.error(`[Auto-Update] Error inserting concept "${topic}":`, err);
+                            reject(err);
+                            return;
+                          }
+                          
+                          insertCount++;
+                          console.log(`[Auto-Update] ✓ Created page ${insertCount}: "${topic}"`);
+                          currentOrderIndex++;
+                          
+                          insertNextConcept(index + 1);
+                        }
+                      );
+                    }
+                    
+                    insertNextConcept(0);
                   }
                 );
               });
