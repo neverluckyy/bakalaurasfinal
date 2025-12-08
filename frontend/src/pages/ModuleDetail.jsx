@@ -277,11 +277,11 @@ const ModuleDetail = () => {
                       >
                         {sectionProgress[section.id] ? 'Continue Learning' : 'Start Learning'}
                       </Link>
-                      {(section.learning_completed || section.quiz_attempted) && (
+                      {section.quiz_completed && (
                         <Link
                           to={`/sections/${section.id}/quiz`}
                           className="btn btn-secondary"
-                          title="Restart this quiz - you've completed the learning material"
+                          title="Restart this quiz - you've completed the quiz at least once"
                         >
                           Restart Quiz
                         </Link>

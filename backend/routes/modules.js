@@ -462,12 +462,16 @@ router.get('/:moduleId/sections', authenticateToken, async (req, res) => {
         
         // Check if quiz has been attempted (answered questions or has draft state)
         let quizAttempted = false;
+        let quizCompleted = false; // Quiz is completed when all questions have been answered (fully submitted)
         let quizFailedOrStopped = false;
         let hasDraftState = false;
         
         if (section.question_count > 0) {
           // Check if user has answered any questions
           quizAttempted = section.answered_questions > 0;
+          
+          // Check if quiz has been fully completed (all questions answered = quiz was submitted)
+          quizCompleted = section.answered_questions >= section.question_count;
           
           // Check if quiz has draft state (stopped/incomplete)
           try {
@@ -486,6 +490,8 @@ router.get('/:moduleId/sections', authenticateToken, async (req, res) => {
             if (draftResult && draftResult.count > 0) {
               quizAttempted = true;
               hasDraftState = true;
+              // If draft exists, quiz is not completed (it was stopped/incomplete)
+              quizCompleted = false;
             }
           } catch (err) {
             // Ignore errors
@@ -553,6 +559,7 @@ router.get('/:moduleId/sections', authenticateToken, async (req, res) => {
             : 0,
           learning_completed: learningCompleted,
           quiz_attempted: quizAttempted,
+          quiz_completed: quizCompleted, // True when all questions have been answered (quiz fully submitted)
           quiz_failed_or_stopped: quizFailedOrStopped
         };
       }));
