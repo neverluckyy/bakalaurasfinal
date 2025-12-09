@@ -131,15 +131,6 @@ This will import all questions from the `social_engineering_quiz_bank_clean.csv`
 npm run dev
 ```
 
-#### Or use the convenience scripts:
-```bash
-# Windows Batch file
-start-dev.bat
-
-# PowerShell script
-.\start-dev.ps1
-```
-
 #### Or start separately:
 ```bash
 # Terminal 1 - Backend (with nodemon auto-restart)
@@ -240,16 +231,17 @@ cd frontend && npm run dev
 │   │   ├── questions.js
 │   │   └── leaderboard.js
 │   └── scripts/
-│       └── import-questions.js
+│       ├── import-questions.js
+│       └── import-learning-content.js
 ├── frontend/
 │   ├── public/
 │   │   ├── index.html
 │   │   └── avatars/
-│   │       ├── robot_forest_mint.svg
-│   │       ├── robot_ocean_teal.svg
-│   │       ├── robot_sky_blue.svg
-│   │       ├── robot_sunset_orange.svg
-│   │       └── robot_violet_dream.svg
+│   │       ├── robot_coral.svg
+│   │       ├── robot_gold.svg
+│   │       ├── robot_lavender.svg
+│   │       ├── robot_mint.svg
+│   │       └── robot_sky.svg
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── Sidebar.js
@@ -262,15 +254,18 @@ cd frontend && npm run dev
 │   │   │   ├── Home.js
 │   │   │   ├── Modules.js
 │   │   │   └── ...
-│   │   ├── App.js
+│   │   ├── App.jsx
 │   │   ├── App.css
-│   │   ├── index.js
+│   │   ├── index.jsx
 │   │   └── index.css
 │   └── package.json
-├── robot_avatars_svg_v3_fullbody/
 ├── social_engineering_quiz_bank_clean.csv
+├── learning_content.csv
 ├── package.json
-└── README.md
+├── README.md
+├── netlify.toml
+├── nixpacks.toml
+└── railway.json
 ```
 
 ## Development

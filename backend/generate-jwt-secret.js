@@ -18,3 +18,5 @@ console.log('='.repeat(80));
 console.log('\nCopy this value and set it as JWT_SECRET in your Railway environment variables.');
 console.log('⚠️  Keep this secret secure and never commit it to git!\n');
 
+
+

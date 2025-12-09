@@ -441,6 +441,14 @@
   width: 100%;
 }
 
+.module-card .btn {
+  display: block;
+  margin: 0 auto;
+  width: fit-content;
+  min-width: 200px;
+  text-align: center;
+}
+
 /* Enhanced Responsive Design */
 @media (max-width: 768px) {
   .home-container {
