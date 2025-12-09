@@ -29,20 +29,25 @@ app.set('trust proxy', 1);
 
 // CORS configuration
 // Explicitly allow both custom domain and Netlify subdomain
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : process.env.NODE_ENV === 'production' 
-    ? [
-        'https://sensebait.pro', 
-        'https://www.sensebait.pro',
-        'https://beamish-granita-b7abb8.netlify.app' // Explicit Netlify subdomain
-      ] 
-    : ['http://localhost:3000'];
+let allowedOrigins = [];
 
-// Add Netlify domains pattern to allow all Netlify subdomains (including future ones)
-if (process.env.NODE_ENV === 'production') {
+if (process.env.ALLOWED_ORIGINS) {
+  // If ALLOWED_ORIGINS is set, use it and also add Netlify pattern
+  allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
+  // Always add Netlify pattern when ALLOWED_ORIGINS is set
+  allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
+} else if (process.env.NODE_ENV === 'production') {
+  // Default production origins
+  allowedOrigins = [
+    'https://sensebait.pro', 
+    'https://www.sensebait.pro',
+    'https://beamish-granita-b7abb8.netlify.app' // Explicit Netlify subdomain
+  ];
   // Allow all Netlify subdomains via regex pattern
   allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
+} else {
+  // Development
+  allowedOrigins = ['http://localhost:3000'];
 }
 
 app.use(cors({
@@ -154,20 +159,26 @@ async function startServer() {
     // Set AUTO_UPDATE_LEARNING_CONTENT=true in Railway environment variables to enable
     if (process.env.AUTO_UPDATE_LEARNING_CONTENT === 'true') {
       console.log('Auto-update enabled: Checking learning content...');
-      const { autoUpdate } = require('./scripts/auto-update-learning-content');
-      // Run asynchronously so it doesn't block server startup
-      autoUpdate()
-        .then(updated => {
-          if (updated) {
-            console.log('✅ Learning content auto-updated on startup');
-          } else {
-            console.log('ℹ️  Learning content is already up to date');
-          }
-        })
-        .catch(err => {
-          console.error('⚠️  Auto-update failed (non-fatal):', err.message);
-          // Don't crash the server if auto-update fails
-        });
+      try {
+        const { autoUpdate } = require('./scripts/auto-update-learning-content');
+        // Run asynchronously so it doesn't block server startup
+        autoUpdate()
+          .then(updated => {
+            if (updated) {
+              console.log('✅ Learning content auto-updated on startup');
+            } else {
+              console.log('ℹ️  Learning content is already up to date');
+            }
+          })
+          .catch(err => {
+            console.error('⚠️  Auto-update failed (non-fatal):', err.message);
+            // Don't crash the server if auto-update fails
+          });
+      } catch (requireError) {
+        console.warn('⚠️  Auto-update script not found. Skipping auto-update.');
+        console.warn('   To enable auto-update, ensure ./scripts/auto-update-learning-content.js exists');
+        // Don't crash the server if the script is missing
+      }
     }
     
     app.listen(PORT, () => {
