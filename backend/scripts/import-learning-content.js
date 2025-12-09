@@ -51,8 +51,19 @@ async function importLearningContent() {
             let processedCount = 0;
             let errorCount = 0;
             
-            results.forEach((row, index) => {
+            // Track order_index per section
+            const sectionOrderMap = new Map();
+            
+            results.forEach((row) => {
               const { module, section, screen_title, read_time_min, content_markdown } = row;
+              
+              // Get or initialize order index for this section
+              const sectionKey = `${module}|${section}`;
+              if (!sectionOrderMap.has(sectionKey)) {
+                sectionOrderMap.set(sectionKey, 0);
+              }
+              const orderIndex = sectionOrderMap.get(sectionKey) + 1;
+              sectionOrderMap.set(sectionKey, orderIndex);
               
               // Find the section ID based on module and section names
               const findSectionQuery = `
@@ -86,7 +97,7 @@ async function importLearningContent() {
                   screen_title,
                   parseInt(read_time_min) || 2,
                   content_markdown,
-                  index + 1
+                  orderIndex
                 ], function(err) {
                   if (err) {
                     console.error('Error inserting learning content:', err);
