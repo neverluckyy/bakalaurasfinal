@@ -21,10 +21,33 @@ async function importLearningContent() {
   const results = [];
   
   return new Promise((resolve, reject) => {
-    // Read CSV file
-    fs.createReadStream(csvFilePath)
-      .pipe(csv())
-      .on('data', (data) => results.push(data))
+    // Read CSV file with UTF-8 encoding and skip BOM if present
+    fs.createReadStream(csvFilePath, { encoding: 'utf8' })
+      .pipe(csv({
+        skipLinesWithError: true,
+        skipEmptyLines: true
+      }))
+      .on('data', (data) => {
+        // Clean up any BOM or encoding issues from keys
+        const cleanedData = {};
+        for (const key in data) {
+          // Remove BOM (UTF-8 BOM: EF BB BF, UTF-16 BOM: FEFF) and null bytes, trim whitespace
+          let cleanKey = key.replace(/^\uFEFF/, '').replace(/^[\uFEFF\u200B-\u200D\u2060]/, '').replace(/\0/g, '').trim();
+          // Handle the specific BOM issue we're seeing
+          cleanKey = cleanKey.replace(/^[^\x20-\x7E]+/, '').trim();
+          // Normalize common column name variations
+          if (cleanKey.toLowerCase().includes('module') && !cleanKey.toLowerCase().startsWith('module')) {
+            cleanKey = 'module';
+          }
+          
+          const cleanValue = typeof data[key] === 'string' 
+            ? data[key].replace(/^\uFEFF/, '').replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '').replace(/\0/g, '').trim() 
+            : data[key];
+          cleanedData[cleanKey] = cleanValue;
+        }
+        
+        results.push(cleanedData);
+      })
       .on('end', async () => {
         console.log(`Read ${results.length} learning content entries from CSV`);
         
@@ -56,6 +79,20 @@ async function importLearningContent() {
             
             results.forEach((row) => {
               const { module, section, screen_title, read_time_min, content_markdown } = row;
+              
+              // Skip rows with missing required fields
+              if (!module || !section || !screen_title) {
+                console.warn(`Skipping row with missing fields: module=${module}, section=${section}, screen_title=${screen_title}`);
+                errorCount++;
+                // Still check if we're done
+                if (processedCount + errorCount === results.length) {
+                  console.log(`\nImport completed!`);
+                  console.log(`✓ Successfully imported: ${processedCount} entries`);
+                  console.log(`✗ Errors: ${errorCount} entries`);
+                  resolve();
+                }
+                return;
+              }
               
               // Get or initialize order index for this section
               const sectionKey = `${module}|${section}`;
