@@ -1,12 +1,12 @@
 const { initDatabase, getDatabase } = require('../database/init');
 
 /**
- * Auto-update script that can be run on server startup
- * This version checks if update is needed before running
- * Safe to run on every deployment
+ * NUCLEAR UPDATE: Deletes ALL learning content for section 1 and rebuilds it
+ * This ensures the database matches the expected structure exactly
+ * Use this if force-update-learning-content.js didn't work
  */
 
-// Embedded data - same as nuclear-update-learning-content.js
+// Embedded data - same as force-update-learning-content.js
 const csvData = [
   {
     Topic: "Understanding social engineering tactics (the \"why it works\")",
@@ -90,78 +90,19 @@ function formatContent(row) {
   return content;
 }
 
-/**
- * Check if content needs updating by checking:
- * 1. If Introduction has references (should not)
- * 2. If we have 8 separate concept pages (not 1 combined "Key Concepts")
- */
-function needsUpdate(db, sectionId) {
+async function nuclearUpdate() {
+  console.log('='.repeat(80));
+  console.log('NUCLEAR UPDATE: Complete Learning Content Rebuild');
+  console.log('='.repeat(80));
+  console.log('');
+  console.log('⚠️  WARNING: This will DELETE ALL learning content for section 1');
+  console.log('   and rebuild it from scratch. This cannot be undone!');
+  console.log('');
+  
+  await initDatabase();
+  const db = getDatabase();
+  
   return new Promise((resolve, reject) => {
-    // Get Introduction
-    db.get(
-      'SELECT content_markdown, order_index FROM learning_content WHERE section_id = ? AND screen_title = ?',
-      [sectionId, 'Introduction'],
-      (err, introRow) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        
-        if (!introRow) {
-          // No Introduction found - needs update
-          console.log('[Auto-Update] Update needed: Introduction not found');
-          resolve(true);
-          return;
-        }
-        
-        // Check if Introduction has references (should not have them)
-        const hasReferences = introRow.content_markdown.includes('References:') || 
-                             introRow.content_markdown.includes('## References') ||
-                             introRow.content_markdown.includes('formatReferences');
-        
-        // Check if we have separate concept pages (should have 8, not 1 combined "Key Concepts")
-        db.all(
-          'SELECT screen_title FROM learning_content WHERE section_id = ? AND order_index > ? ORDER BY order_index',
-          [sectionId, introRow.order_index || 1],
-          (err, conceptPages) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            
-            // Filter out "Real World Examples" and similar
-            const actualConcepts = conceptPages.filter(c => 
-              !c.screen_title.toLowerCase().includes('example')
-            );
-            
-            // Check if we have a combined "Key Concepts" page (bad) or separate pages (good)
-            const hasKeyConceptsPage = actualConcepts.some(c => 
-              c.screen_title === 'Key Concepts'
-            );
-            
-            // Needs update if:
-            // 1. Introduction has references, OR
-            // 2. We have a combined "Key Concepts" page (should be split), OR
-            // 3. We don't have exactly 8 separate concept pages
-            const needsUpdate = hasReferences || hasKeyConceptsPage || actualConcepts.length !== 8;
-            
-            if (needsUpdate) {
-              console.log(`[Auto-Update] Update needed: hasReferences=${hasReferences}, hasKeyConceptsPage=${hasKeyConceptsPage}, conceptPages=${actualConcepts.length} (expected 8)`);
-            }
-            
-            resolve(needsUpdate);
-          }
-        );
-      }
-    );
-  });
-}
-
-async function autoUpdate() {
-  try {
-    await initDatabase();
-    const db = getDatabase();
-    
     // Find section
     const findSectionQuery = `
       SELECT s.id 
@@ -172,68 +113,74 @@ async function autoUpdate() {
       AND s.order_index = 1
     `;
     
-    return new Promise((resolve, reject) => {
-      db.get(findSectionQuery, [], async (err, section) => {
+    db.get(findSectionQuery, [], (err, section) => {
+      if (err) {
+        console.error('❌ Error finding section:', err);
+        reject(err);
+        return;
+      }
+      
+      if (!section) {
+        console.error('❌ Section not found!');
+        reject(new Error('Section not found'));
+        return;
+      }
+      
+      const sectionId = section.id;
+      console.log(`✓ Found section ID: ${sectionId}`);
+      console.log('');
+      
+      // STEP 1: Get all content IDs for this section
+      console.log('Step 1: Finding all existing content...');
+      db.all('SELECT id FROM learning_content WHERE section_id = ?', [sectionId], (err, allContent) => {
         if (err) {
-          console.error('[Auto-Update] Error finding section:', err);
+          console.error('❌ Error finding content:', err);
           reject(err);
           return;
         }
         
-        if (!section) {
-          console.log('[Auto-Update] Section not found, skipping update');
-          resolve(false);
-          return;
+        const contentIds = allContent.map(c => c.id);
+        console.log(`   Found ${contentIds.length} existing content items`);
+        console.log('');
+        
+        // STEP 2: Delete all user progress for this section's content
+        if (contentIds.length > 0) {
+          console.log('Step 2: Deleting user progress...');
+          db.run(`DELETE FROM user_learning_progress WHERE learning_content_id IN (${contentIds.map(() => '?').join(',')})`, 
+            contentIds, (err) => {
+              if (err) {
+                console.error('⚠️  Warning: Error deleting user progress:', err);
+              } else {
+                console.log(`   ✓ Deleted user progress for ${contentIds.length} items`);
+              }
+              deleteAllContent();
+            });
+        } else {
+          deleteAllContent();
         }
         
-        const sectionId = section.id;
-        
-        // Check if update is needed
-        try {
-          const updateNeeded = await needsUpdate(db, sectionId);
-          
-          if (!updateNeeded) {
-            console.log('[Auto-Update] Content is already up to date, skipping update');
-            resolve(false);
-            return;
-          }
-          
-          console.log('[Auto-Update] Content needs updating, starting update...');
-          
-          // Get all content IDs for this section
-          db.all('SELECT id FROM learning_content WHERE section_id = ?', [sectionId], (err, allContent) => {
+        function deleteAllContent() {
+          // STEP 3: Delete ALL learning content for this section
+          console.log('');
+          console.log('Step 3: Deleting ALL learning content...');
+          db.run('DELETE FROM learning_content WHERE section_id = ?', [sectionId], (err) => {
             if (err) {
-              console.error('[Auto-Update] Error finding content:', err);
+              console.error('❌ Error deleting content:', err);
               reject(err);
               return;
             }
+            console.log('   ✓ Deleted all existing content');
+            console.log('');
             
-            const contentIds = allContent.map(c => c.id);
+            // STEP 4: Build and insert new content
+            console.log('Step 4: Building new content structure...');
             
-            // Delete user progress
-            if (contentIds.length > 0) {
-              db.run(`DELETE FROM user_learning_progress WHERE learning_content_id IN (${contentIds.map(() => '?').join(',')})`, 
-                contentIds, (err) => {
-                  if (err) {
-                    console.error('[Auto-Update] Warning: Error deleting user progress:', err);
-                  }
-                  deleteAndInsert();
-                });
-            } else {
-              deleteAndInsert();
-            }
+            const firstRow = csvData[0];
+            const firstRowTopic = firstRow['Topic'] || firstRow.Topic;
+            const firstRowReferences = firstRow['References'] || firstRow.References || '';
             
-            function deleteAndInsert() {
-              // Delete ALL learning content for this section
-              db.run('DELETE FROM learning_content WHERE section_id = ?', [sectionId], (err) => {
-                if (err) {
-                  console.error('[Auto-Update] Error deleting content:', err);
-                  reject(err);
-                  return;
-                }
-                
-                // Build Introduction WITHOUT references
-                const introductionContent = `Welcome to the **Phishing and Social Engineering** section!
+            // Build Introduction content
+            const introductionContent = `Welcome to the **Phishing and Social Engineering** section!
 
 This section will help you understand how attackers use psychological manipulation to trick people into revealing sensitive information or taking actions that compromise security.
 
@@ -241,76 +188,107 @@ You'll learn about:
 • What social engineering is and how it works
 • Different types of social engineering attacks (phishing, vishing, smishing, pretexting, baiting, tailgating)
 • The psychological tactics attackers use
-• How to recognize and respond to these threats safely`;
+• How to recognize and respond to these threats safely
+
+${formatReferences(firstRowReferences)}`;
+            
+            // Build Key Concepts content
+            let keyConceptsContent = `## ${firstRowTopic}\n\n`;
+            keyConceptsContent += formatContent(firstRow);
+            
+            if (csvData.length > 1) {
+              keyConceptsContent += '\n\n## Types of Social Engineering Attacks\n\n';
+              for (let i = 1; i < csvData.length; i++) {
+                const row = csvData[i];
+                const topic = row['Topic'] || row.Topic;
+                const teachingMaterial = row['Teaching_Material'] || row.Teaching_Material;
+                if (topic && teachingMaterial) {
+                  keyConceptsContent += `### ${topic}\n\n`;
+                  keyConceptsContent += formatContent(row);
+                  keyConceptsContent += '\n\n';
+                }
+              }
+            }
+            
+            console.log('   ✓ Built Introduction content');
+            console.log('   ✓ Built Key Concepts content');
+            console.log('');
+            
+            // STEP 5: Insert Introduction
+            console.log('Step 5: Inserting new content...');
+            db.run(
+              'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
+              [sectionId, 'Introduction', 2, introductionContent, 1],
+              function(err) {
+                if (err) {
+                  console.error('❌ Error inserting Introduction:', err);
+                  reject(err);
+                  return;
+                }
+                const introId = this.lastID;
+                console.log(`   ✓ Inserted Introduction (ID: ${introId})`);
                 
-                // Insert Introduction (without references)
+                // STEP 6: Insert Key Concepts
                 db.run(
                   'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
-                  [sectionId, 'Introduction', 2, introductionContent, 1],
+                  [sectionId, 'Key Concepts', 10, keyConceptsContent, 2],
                   function(err) {
                     if (err) {
-                      console.error('[Auto-Update] Error inserting Introduction:', err);
+                      console.error('❌ Error inserting Key Concepts:', err);
                       reject(err);
                       return;
                     }
+                    const keyConceptsId = this.lastID;
+                    console.log(`   ✓ Inserted Key Concepts (ID: ${keyConceptsId})`);
+                    console.log('');
                     
-                    console.log('[Auto-Update] ✓ Inserted Introduction (without references)');
-                    
-                    // Insert individual concept pages (one per concept)
-                    let currentOrderIndex = 2;
-                    let insertCount = 0;
-                    
-                    function insertNextConcept(index) {
-                      if (index >= csvData.length) {
-                        console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
-                        console.log('[Auto-Update] ✅ Learning content updated successfully!');
-                        resolve(true);
-                        return;
-                      }
-                      
-                      const row = csvData[index];
-                      const topic = row['Topic'] || row.Topic;
-                      const conceptContent = formatContent(row);
-                      
-                      const wordCount = conceptContent.split(/\s+/).length;
-                      const readTime = Math.max(1, Math.ceil(wordCount / 200));
-                      
-                      db.run(
-                        'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
-                        [sectionId, topic, readTime, conceptContent, currentOrderIndex],
-                        function(err) {
-                          if (err) {
-                            console.error(`[Auto-Update] Error inserting concept "${topic}":`, err);
-                            reject(err);
-                            return;
-                          }
-                          
-                          insertCount++;
-                          console.log(`[Auto-Update] ✓ Created page ${insertCount}: "${topic}"`);
-                          currentOrderIndex++;
-                          
-                          insertNextConcept(index + 1);
+                    // STEP 7: Verify
+                    console.log('Step 6: Verifying update...');
+                    db.all('SELECT id, screen_title, order_index, LENGTH(content_markdown) as len FROM learning_content WHERE section_id = ? ORDER BY order_index', 
+                      [sectionId], 
+                      (err, verify) => {
+                        if (err) {
+                          console.error('❌ Error verifying:', err);
+                        } else {
+                          console.log('');
+                          console.log('   Content Summary:');
+                          verify.forEach(item => {
+                            console.log(`   ✓ ${item.screen_title} (ID: ${item.id}, order: ${item.order_index}, length: ${item.len} chars)`);
+                          });
                         }
-                      );
-                    }
-                    
-                    insertNextConcept(0);
+                        
+                        console.log('');
+                        console.log('='.repeat(80));
+                        console.log('✅ NUCLEAR UPDATE COMPLETED SUCCESSFULLY!');
+                        console.log('='.repeat(80));
+                        console.log('');
+                        console.log('The learning content has been completely rebuilt.');
+                        console.log('The new content should now be visible on the website.');
+                        console.log('');
+                        console.log('If you still see old content:');
+                        console.log('  1. Hard refresh your browser (Ctrl+Shift+R or Cmd+Shift+R)');
+                        console.log('  2. Clear browser cache completely');
+                        console.log('  3. Open in incognito/private mode');
+                        console.log('  4. Wait 1-2 minutes for Railway to restart if needed');
+                        console.log('');
+                        
+                        resolve();
+                      }
+                    );
                   }
                 );
-              });
-            }
+              }
+            );
           });
-        } catch (checkErr) {
-          console.error('[Auto-Update] Error checking if update needed:', checkErr);
-          reject(checkErr);
         }
       });
     });
-  } catch (error) {
-    console.error('[Auto-Update] Fatal error:', error);
-    throw error;
-  }
+  });
 }
 
-module.exports = { autoUpdate };
+// Run the update
+nuclearUpdate().catch(err => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
 
