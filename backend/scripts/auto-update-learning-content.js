@@ -10,7 +10,28 @@ const { initDatabase, getDatabase } = require('../database/init');
  * so each topic stays on its own page with references.
  */
 
-const CSV_PATH = path.join(__dirname, '../../learning_content.csv');
+// Try multiple possible paths for the CSV file
+const possiblePaths = [
+  path.join(__dirname, '../learning_content.csv'), // From backend/scripts -> backend/learning_content.csv
+  path.join(__dirname, '../../learning_content.csv'), // From backend/scripts -> root/learning_content.csv
+  path.join(process.cwd(), 'learning_content.csv'), // From current working directory
+  path.join(process.cwd(), '../learning_content.csv'), // One level up from working directory
+  '/app/learning_content.csv', // Absolute path in container
+];
+
+// Find the first path that exists
+let CSV_PATH = null;
+for (const possiblePath of possiblePaths) {
+  if (fs.existsSync(possiblePath)) {
+    CSV_PATH = possiblePath;
+    break;
+  }
+}
+
+// If not found, use the first path as default (will error with helpful message)
+if (!CSV_PATH) {
+  CSV_PATH = possiblePaths[0];
+}
 const TARGET_MODULE = 'Security Awareness Essentials';
 const TARGET_SECTION = 'Phishing and Social Engineering';
 
@@ -41,7 +62,8 @@ const getAsync = (db, sql, params = []) =>
 async function loadSectionContentFromCsv() {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(CSV_PATH)) {
-      reject(new Error(`Learning content CSV not found at ${CSV_PATH}`));
+      const checkedPaths = possiblePaths.join(', ');
+      reject(new Error(`Learning content CSV not found. Checked paths: ${checkedPaths}. Current: ${CSV_PATH}. __dirname: ${__dirname}, cwd: ${process.cwd()}`));
       return;
     }
 
