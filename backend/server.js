@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: './config.env' });
 
 const authRoutes = require('./routes/auth');
@@ -160,23 +161,40 @@ async function startServer() {
     if (process.env.AUTO_UPDATE_LEARNING_CONTENT === 'true') {
       console.log('Auto-update enabled: Checking learning content...');
       try {
-        const { autoUpdate } = require('./scripts/auto-update-learning-content');
-        // Run asynchronously so it doesn't block server startup
-        autoUpdate()
-          .then(updated => {
-            if (updated) {
-              console.log('✅ Learning content auto-updated on startup');
-            } else {
-              console.log('ℹ️  Learning content is already up to date');
-            }
-          })
-          .catch(err => {
-            console.error('⚠️  Auto-update failed (non-fatal):', err.message);
-            // Don't crash the server if auto-update fails
-          });
+        // Use absolute path for better reliability across different environments
+        const scriptPath = path.join(__dirname, 'scripts', 'auto-update-learning-content');
+        const fullPath = scriptPath + '.js';
+        
+        // Check if file exists before requiring
+        if (!fs.existsSync(fullPath)) {
+          console.warn('⚠️  Auto-update script not found at:', fullPath);
+          console.warn('   Current working directory:', process.cwd());
+          console.warn('   __dirname:', __dirname);
+          console.warn('   To enable auto-update, ensure the script exists at the expected path');
+        } else {
+          console.log('✅ Auto-update script found at:', fullPath);
+          const { autoUpdate } = require(scriptPath);
+          // Run asynchronously so it doesn't block server startup
+          autoUpdate()
+            .then(updated => {
+              if (updated) {
+                console.log('✅ Learning content auto-updated on startup');
+              } else {
+                console.log('ℹ️  Learning content is already up to date');
+              }
+            })
+            .catch(err => {
+              console.error('⚠️  Auto-update failed (non-fatal):', err.message);
+              console.error('   Error stack:', err.stack);
+              // Don't crash the server if auto-update fails
+            });
+        }
       } catch (requireError) {
         console.warn('⚠️  Auto-update script not found. Skipping auto-update.');
-        console.warn('   To enable auto-update, ensure ./scripts/auto-update-learning-content.js exists');
+        console.warn('   Error:', requireError.message);
+        console.warn('   Stack:', requireError.stack);
+        console.warn('   Current working directory:', process.cwd());
+        console.warn('   __dirname:', __dirname);
         // Don't crash the server if the script is missing
       }
     }
