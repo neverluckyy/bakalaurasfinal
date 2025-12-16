@@ -6,6 +6,13 @@
   # Directory to publish (where the built files are)
   publish = "build"
 
+# Proxy rules for Backend API
+[[redirects]]
+  from = "/api/*"
+  to = "https://bakalaurasfinal-bak.up.railway.app/api/:splat"
+  status = 200
+  force = true
+
 # Redirect rules for React Router (SPA)
 [[redirects]]
   from = "/*"
