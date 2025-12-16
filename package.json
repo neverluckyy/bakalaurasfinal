@@ -14,7 +14,8 @@
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.9.0",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "jest": "^30.2.0"
   },
   "keywords": [
     "social-engineering",
