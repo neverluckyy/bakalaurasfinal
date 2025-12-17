@@ -23,6 +23,7 @@ router.get('/stats', authenticateToken, (req, res) => {
   `;
 
   // Get completed modules count
+  // A module is completed if all its sections are completed
   const modulesCompletedQuery = `
     SELECT COUNT(DISTINCT m.id) as modules_completed
     FROM modules m
@@ -30,21 +31,46 @@ router.get('/stats', authenticateToken, (req, res) => {
       SELECT 1
       FROM sections s
       WHERE s.module_id = m.id
-      AND (
-        SELECT COUNT(DISTINCT q.id)
-        FROM questions q
-        WHERE q.section_id = s.id
-      ) > 0
-      AND (
-        SELECT COUNT(DISTINCT q2.id)
-        FROM questions q2
-        LEFT JOIN user_progress up ON q2.id = up.question_id AND up.user_id = ?
-        WHERE q2.section_id = s.id AND up.is_correct = 1
-      ) * 1.0 / (
-        SELECT COUNT(DISTINCT q3.id)
-        FROM questions q3
-        WHERE q3.section_id = s.id
-      ) < 0.8
+      AND NOT (
+        -- Section is completed if:
+        -- 1. It has questions AND user passed (>80%)
+        (
+          (SELECT COUNT(DISTINCT q.id) FROM questions q WHERE q.section_id = s.id) > 0
+          AND
+          (
+            SELECT COUNT(DISTINCT q2.id)
+            FROM questions q2
+            LEFT JOIN user_progress up ON q2.id = up.question_id AND up.user_id = ?
+            WHERE q2.section_id = s.id AND up.is_correct = 1
+          ) * 1.0 / (
+            SELECT COUNT(DISTINCT q3.id)
+            FROM questions q3
+            WHERE q3.section_id = s.id
+          ) >= 0.8
+        )
+        OR
+        -- 2. It has NO questions AND user read all content
+        (
+          (SELECT COUNT(DISTINCT q.id) FROM questions q WHERE q.section_id = s.id) = 0
+          AND
+          (
+            SELECT COUNT(DISTINCT lc.id)
+            FROM learning_content lc
+            WHERE lc.section_id = s.id
+          ) > 0
+          AND
+          (
+            SELECT COUNT(DISTINCT lc.id)
+            FROM learning_content lc
+            JOIN user_learning_progress ulp ON lc.id = ulp.learning_content_id AND ulp.user_id = ?
+            WHERE lc.section_id = s.id AND ulp.completed = 1
+          ) = (
+            SELECT COUNT(DISTINCT lc.id)
+            FROM learning_content lc
+            WHERE lc.section_id = s.id
+          )
+        )
+      )
     )
   `;
 
@@ -53,20 +79,44 @@ router.get('/stats', authenticateToken, (req, res) => {
     SELECT COUNT(DISTINCT s.id) as sections_completed
     FROM sections s
     WHERE (
-      SELECT COUNT(DISTINCT q.id)
-      FROM questions q
-      WHERE q.section_id = s.id
-    ) > 0
-    AND (
-      SELECT COUNT(DISTINCT q2.id)
-      FROM questions q2
-      LEFT JOIN user_progress up ON q2.id = up.question_id AND up.user_id = ?
-      WHERE q2.section_id = s.id AND up.is_correct = 1
-    ) * 1.0 / (
-      SELECT COUNT(DISTINCT q3.id)
-      FROM questions q3
-      WHERE q3.section_id = s.id
-    ) >= 0.8
+      -- 1. It has questions AND user passed (>80%)
+      (
+        (SELECT COUNT(DISTINCT q.id) FROM questions q WHERE q.section_id = s.id) > 0
+        AND
+        (
+          SELECT COUNT(DISTINCT q2.id)
+          FROM questions q2
+          LEFT JOIN user_progress up ON q2.id = up.question_id AND up.user_id = ?
+          WHERE q2.section_id = s.id AND up.is_correct = 1
+        ) * 1.0 / (
+          SELECT COUNT(DISTINCT q3.id)
+          FROM questions q3
+          WHERE q3.section_id = s.id
+        ) >= 0.8
+      )
+      OR
+      -- 2. It has NO questions AND user read all content
+      (
+        (SELECT COUNT(DISTINCT q.id) FROM questions q WHERE q.section_id = s.id) = 0
+        AND
+        (
+          SELECT COUNT(DISTINCT lc.id)
+          FROM learning_content lc
+          WHERE lc.section_id = s.id
+        ) > 0
+        AND
+        (
+          SELECT COUNT(DISTINCT lc.id)
+          FROM learning_content lc
+          JOIN user_learning_progress ulp ON lc.id = ulp.learning_content_id AND ulp.user_id = ?
+          WHERE lc.section_id = s.id AND ulp.completed = 1
+        ) = (
+          SELECT COUNT(DISTINCT lc.id)
+          FROM learning_content lc
+          WHERE lc.section_id = s.id
+        )
+      )
+    )
   `;
 
   // Get quizzes passed count (sections where user got 80% or more questions correct)
@@ -104,21 +154,23 @@ router.get('/stats', authenticateToken, (req, res) => {
     }
 
     // Get completed modules count
-    db.get(modulesCompletedQuery, [userId], (err, modulesResult) => {
+    // Need to pass userId twice for the two subqueries (Case 1 and Case 2)
+    db.get(modulesCompletedQuery, [userId, userId], (err, modulesResult) => {
       if (err) {
         console.error('Database error:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
       // Get completed sections count
-      db.all(sectionsCompletedQuery, [userId], (err, sectionsResult) => {
+      // Need to pass userId twice for the two subqueries
+      db.get(sectionsCompletedQuery, [userId, userId], (err, sectionsResult) => {
         if (err) {
           console.error('Database error:', err);
           return res.status(500).json({ error: 'Database error' });
         }
 
         // Get quizzes passed count
-        db.all(quizzesPassedQuery, [userId], (err, quizzesResult) => {
+        db.get(quizzesPassedQuery, [userId], (err, quizzesResult) => {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Database error' });
@@ -132,8 +184,8 @@ router.get('/stats', authenticateToken, (req, res) => {
             }
 
             const modulesCompleted = modulesResult?.modules_completed || 0;
-            const sectionsCompleted = sectionsResult?.length || 0;
-            const quizzesPassed = quizzesResult?.length || 0;
+            const sectionsCompleted = sectionsResult?.sections_completed || 0;
+            const quizzesPassed = quizzesResult?.quizzes_passed || 0;
             const daysActive = daysResult?.days_active || 0;
 
             res.json({
