@@ -1,0 +1,88 @@
+Verifying learning content in database...
+
+Database connection established
+Database initialized successfully with modules and sections
+Found section: Security Awareness Essentials > Phishing and Social Engineering
+Section ID: 1
+
+Total learning content items: 11
+
+Learning content items:
+================================================================================
+
+1. Introduction
+   Order: 1
+   Read time: 3 min
+   Content length: 1212 characters
+   Preview: "Social engineering uses psychology (trust, urgency, fear, curiosity, helpfulness) to get people to ...
+
+2. Understanding social engineering tactics (the 'why it works')
+   Order: 2
+   Read time: 3 min
+   Content length: 1394 characters
+   Preview: "Social engineering is a set of manipulation techniques that gets people to voluntarily give access,...
+
+3. Phishing (email): 'the inbox trap'
+   Order: 3
+   Read time: 3 min
+   Content length: 1477 characters
+   Preview: "Email phishing impersonates trusted senders (banks, vendors, HR/IT, leadership) to push you to clic...
+
+4. Vishing (voice): 'the convincing caller'
+   Order: 4
+   Read time: 2 min
+   Content length: 1096 characters
+   Preview: "Vishing is phishing by phone/voice, and it often succeeds because voice adds social pressure and th...
+
+5. Smishing (SMS/text): 'fast taps
+   Order: 5
+   Read time: 2 min
+   Content length: 1 characters
+   Preview: 2...
+
+6. Pretexting: 'the believable story'
+   Order: 6
+   Read time: 3 min
+   Content length: 1071 characters
+   Preview: "Pretexting is when an attacker invents a scenario (the pretext) to justify why you should give info...
+
+7. Baiting: 'free stuff that costs you'
+   Order: 7
+   Read time: 2 min
+   Content length: 992 characters
+   Preview: "Baiting offers something enticing free downloads, gift cards, 'leaked payroll,' or even a physical ...
+
+8. Tailgating (physical): 'the door-hold exploit'
+   Order: 8
+   Read time: 2 min
+   Content length: 1092 characters
+   Preview: "Tailgating (piggybacking) is a physical social engineering attack where someone without access ente...
+
+9. Wrap-up checklist (Stop. Verify. Report.)
+   Order: 9
+   Read time: 2 min
+   Content length: 993 characters
+   Preview: "1) Pause when you feel rushed or emotionally pushed. 2) Verify out-of-band: use known numbers/sites...
+
+10. Real-World Examples
+   Order: 10
+   Read time: 8 min
+   Content length: 4699 characters
+   Preview: "**Pair 1 ��� ""Bgs Security: You Have Messages In Quarantine"" ��� fake sign-in page**![Bgs Securit...
+
+11. Summary
+   Order: 11
+   Read time: 2 min
+   Content length: 173 characters
+   Preview: "- Social engineering targets people���not systems.- Expect urgency or secrecy; verify independently...
+
+================================================================================
+
+Verification:
+✓ Introduction: FOUND
+✓ Key Concepts: ❌ MISSING
+
+================================================================================
+
+To update the content, run:
+  node scripts/update-module1-section1-embedded.js

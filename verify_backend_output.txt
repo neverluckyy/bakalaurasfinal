@@ -1,0 +1,28 @@
+🔍 Verifying Backend at https://bakalaurasfinal-production.up.railway.app
+----------------------------------------
+Testing /api/health...
+✅ /api/health is OK
+Response: {
+  "status": "OK",
+  "timestamp": "2025-12-17T17:25:53.172Z"
+}
+----------------------------------------
+Testing / ...
+✅ / is OK
+Response: {
+  "message": "Backend API is running!",
+  "endpoints": {
+    "health": "/api/health",
+    "test": "/api/test",
+    "auth": "/api/auth/*",
+    "modules": "/api/modules/*",
+    "sections": "/api/sections/*",
+    "learningContent": "/api/learning-content/*"
+  },
+  "timestamp": "2025-12-17T17:25:53.678Z"
+}
+----------------------------------------
+Testing /api/auth/register ...
+✅ Registration successful
+User created: test_1765992353753@example.com
+----------------------------------------
