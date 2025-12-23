@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Phishing Images</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1A1A2E;
+            color: white;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .image-test {
+            margin: 20px 0;
+            padding: 15px;
+            background: #282840;
+            border-radius: 8px;
+            border: 1px solid #3A3A5A;
+        }
+        .image-test img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        .success { background: #10b981; color: white; }
+        .error { background: #ef4444; color: white; }
+        .loading { background: #6A5ACD; color: white; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Phishing Images Test</h1>
+        <p>Testing if images are accessible from different sources:</p>
+        
+        <div class="image-test">
+            <h3>Test 1: Relative Path (Netlify/Frontend)</h3>
+            <div>Path: <code>/phishing-examples/bgs-security-email.png</code></div>
+            <img id="img1" src="/phishing-examples/bgs-security-email.png" 
+                 alt="BGS Security Email" 
+                 onerror="this.parentElement.innerHTML += '<span class=\'status error\'>❌ Failed</span>'"
+                 onload="this.parentElement.innerHTML += '<span class=\'status success\'>✅ Loaded</span>'">
+        </div>
+
+        <div class="image-test">
+            <h3>Test 2: Backend URL (Development/Railway)</h3>
+            <div>Path: <code>http://localhost:5000/phishing-examples/bgs-security-email.png</code></div>
+            <img id="img2" src="http://localhost:5000/phishing-examples/bgs-security-email.png" 
+                 alt="BGS Security Email (Backend)"
+                 onerror="this.parentElement.innerHTML += '<span class=\'status error\'>❌ Failed (backend may not be running)</span>'"
+                 onload="this.parentElement.innerHTML += '<span class=\'status success\'>✅ Loaded</span>'">
+        </div>
+
+        <div class="image-test">
+            <h3>Test 3: Production Backend URL</h3>
+            <div>Path: <code>https://bakalaurasfinal-production.up.railway.app/phishing-examples/bgs-security-email.png</code></div>
+            <img id="img3" src="https://bakalaurasfinal-production.up.railway.app/phishing-examples/bgs-security-email.png" 
+                 alt="BGS Security Email (Production Backend)"
+                 onerror="this.parentElement.innerHTML += '<span class=\'status error\'>❌ Failed</span>'"
+                 onload="this.parentElement.innerHTML += '<span class=\'status success\'>✅ Loaded</span>'">
+        </div>
+
+        <h2>All Images:</h2>
+        <div class="image-test">
+            <h3>BGS Security Email</h3>
+            <img src="/phishing-examples/bgs-security-email.png" alt="BGS Security Email">
+        </div>
+        <div class="image-test">
+            <h3>BGS Security Website</h3>
+            <img src="/phishing-examples/bgs-security-website.png" alt="BGS Security Website">
+        </div>
+        <div class="image-test">
+            <h3>Office 365 Email</h3>
+            <img src="/phishing-examples/office365-email.png" alt="Office 365 Email">
+        </div>
+        <div class="image-test">
+            <h3>Office 365 Website</h3>
+            <img src="/phishing-examples/office365-website.png" alt="Office 365 Website">
+        </div>
+        <div class="image-test">
+            <h3>ShareFile Email</h3>
+            <img src="/phishing-examples/sharefile-email.png" alt="ShareFile Email">
+        </div>
+        <div class="image-test">
+            <h3>ShareFile Website</h3>
+            <img src="/phishing-examples/sharefile-website.png" alt="ShareFile Website">
+        </div>
+    </div>
+</body>
+</html>
+
