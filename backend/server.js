@@ -89,8 +89,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Static files
+// CORS middleware is applied globally above, so these files will have proper CORS headers
 app.use('/avatars', express.static(path.join(__dirname, '../frontend/public/avatars')));
-app.use('/phishing-examples', express.static(path.join(__dirname, '../frontend/public/phishing-examples')));
+app.use('/phishing-examples', express.static(path.join(__dirname, '../frontend/public/phishing-examples'), {
+  setHeaders: (res, path) => {
+    // Set long cache for images
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+}));
 
 // Routes
 // Root endpoint - helpful info

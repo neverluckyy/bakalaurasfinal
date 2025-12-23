@@ -11,20 +11,15 @@ const getBackendImageUrl = (imagePath) => {
     return imagePath;
   }
   
-  // Always use backend URL for images since they're served from backend
-  // Check if baseURL is set (development or production with REACT_APP_API_URL)
-  if (axios.defaults.baseURL) {
-    return `${axios.defaults.baseURL}${imagePath}`;
-  }
-  
-  // Fallback: In production, if baseURL not set, use the Railway backend directly
-  // This ensures images always load even if environment variables aren't configured
+  // In production, always use the Railway backend URL directly
+  // This ensures images load correctly even if REACT_APP_API_URL is not set
   if (process.env.NODE_ENV === 'production') {
     return `https://bakalaurasfinal-production.up.railway.app${imagePath}`;
   }
   
-  // Development fallback
-  return `http://localhost:5000${imagePath}`;
+  // In development, use axios baseURL if set, otherwise localhost
+  const baseURL = axios.defaults.baseURL || 'http://localhost:5000';
+  return `${baseURL}${imagePath}`;
 };
 
 // Helper function to get the correct image URL
