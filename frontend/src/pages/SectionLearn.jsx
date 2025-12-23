@@ -5,18 +5,26 @@ import { ArrowLeft, BookOpen, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import './SectionLearn.css';
 
-// Helper to get backend URL for image fallback
+// Helper to get backend URL for images
 const getBackendImageUrl = (imagePath) => {
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
   
+  // Always use backend URL for images since they're served from backend
+  // Check if baseURL is set (development or production with REACT_APP_API_URL)
   if (axios.defaults.baseURL) {
     return `${axios.defaults.baseURL}${imagePath}`;
   }
   
-  // Fallback for production if baseURL not set
-  return `https://bakalaurasfinal-production.up.railway.app${imagePath}`;
+  // Fallback: In production, if baseURL not set, use the Railway backend directly
+  // This ensures images always load even if environment variables aren't configured
+  if (process.env.NODE_ENV === 'production') {
+    return `https://bakalaurasfinal-production.up.railway.app${imagePath}`;
+  }
+  
+  // Development fallback
+  return `http://localhost:5000${imagePath}`;
 };
 
 // Helper function to get the correct image URL
@@ -26,15 +34,9 @@ const getImageUrl = (imagePath) => {
     return imagePath;
   }
   
-  // In development, images are served by backend
-  if (process.env.NODE_ENV === 'development') {
-    const backendUrl = axios.defaults.baseURL || 'http://localhost:5000';
-    return `${backendUrl}${imagePath}`;
-  }
-  
-  // In production, try relative path first (images may be in Netlify build)
-  // If that fails, onError handler will try backend URL as fallback
-  return imagePath;
+  // In both development and production, images are served by backend
+  // Use backend URL directly to ensure images load reliably
+  return getBackendImageUrl(imagePath);
 };
 
 const SectionLearn = () => {
