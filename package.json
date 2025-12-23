@@ -1,0 +1,31 @@
+{
+  "name": "social-engineering-learning-app",
+  "version": "1.0.0",
+  "description": "Full-stack Social Engineering Learning Application",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "import-data": "cd backend && node scripts/import-questions.js"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.9.0",
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "social-engineering",
+    "learning",
+    "react",
+    "nodejs",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.11.0"
+  }
+}
