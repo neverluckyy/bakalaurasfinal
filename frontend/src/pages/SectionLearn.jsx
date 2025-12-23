@@ -387,31 +387,46 @@ const SectionLearn = () => {
                         className="phishing-example-image"
                         loading="lazy"
                         onError={(e) => {
-                          console.error('Failed to load image from:', imageUrl);
+                          console.error('=== IMAGE LOAD ERROR ===');
                           console.error('Original path:', imagePath);
+                          console.error('Attempted URL:', imageUrl);
+                          console.error('Environment:', process.env.NODE_ENV);
+                          console.error('Axios baseURL:', axios.defaults.baseURL || '(not set)');
+                          console.error('Image element:', {
+                            src: e.target.src,
+                            naturalWidth: e.target.naturalWidth,
+                            naturalHeight: e.target.naturalHeight,
+                            complete: e.target.complete
+                          });
                           
                           // Prevent infinite loop - check if we've already tried the backend
                           if (e.target.dataset.fallbackAttempted === 'true') {
-                            console.error('Backend fallback also failed. Hiding image.');
+                            console.error('❌ Backend fallback also failed. Both URLs failed to load.');
+                            console.error('Final attempted URL:', e.target.src);
                             e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #8A8A9A;">Image not available: ${altText || 'Phishing example'}</div>`;
+                            e.target.parentElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #8A8A9A;">Image not available: ${altText || 'Phishing example'}<br/><small>Check browser console for details</small></div>`;
                             return;
                           }
                           
                           // Try backend URL as fallback
                           const backendUrl = getBackendImageUrl(imagePath);
                           if (backendUrl !== imageUrl) {
-                            console.log('Trying backend URL as fallback:', backendUrl);
+                            console.log('🔄 Trying backend URL as fallback:', backendUrl);
                             e.target.dataset.fallbackAttempted = 'true';
                             e.target.src = backendUrl;
                           } else {
-                            console.error('No fallback available. Hiding image.');
+                            console.error('❌ No fallback available (both URLs are the same).');
                             e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #8A8A9A;">Image not available: ${altText || 'Phishing example'}</div>`;
+                            e.target.parentElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #8A8A9A;">Image not available: ${altText || 'Phishing example'}<br/><small>Check browser console for details</small></div>`;
                           }
                         }}
-                        onLoad={() => {
-                          console.log('Successfully loaded image:', imageUrl);
+                        onLoad={(e) => {
+                          console.log('✅ Successfully loaded image:', imageUrl);
+                          console.log('Image details:', {
+                            src: e.target.src,
+                            naturalWidth: e.target.naturalWidth,
+                            naturalHeight: e.target.naturalHeight
+                          });
                         }}
                       />
                       {altText && (

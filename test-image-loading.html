@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Loading Diagnostic</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1A1A2E;
+            color: white;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #282840;
+            border-radius: 8px;
+            border: 1px solid #3A3A5A;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #4A9EFF;
+        }
+        .test-section img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 2px solid #3A3A5A;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 5px;
+            font-weight: bold;
+        }
+        .success { background: #10b981; color: white; }
+        .error { background: #ef4444; color: white; }
+        .info { background: #6A5ACD; color: white; }
+        .test-url {
+            font-family: monospace;
+            background: #1A1A2E;
+            padding: 5px;
+            border-radius: 4px;
+            margin: 5px 0;
+            word-break: break-all;
+        }
+        .log {
+            background: #1A1A2E;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #4A9EFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #3A8EEF;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Image Loading Diagnostic Tool</h1>
+    <p>This page helps diagnose why phishing example images aren't loading.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Development Backend (localhost:5000)</h2>
+        <div class="test-url">http://localhost:5000/phishing-examples/bgs-security-email.png</div>
+        <button onclick="testImage('http://localhost:5000/phishing-examples/bgs-security-email.png', 'img1')">Test Image</button>
+        <div id="status1"></div>
+        <img id="img1" alt="BGS Security Email" onload="updateStatus('img1', 'status1', true)" onerror="updateStatus('img1', 'status1', false)">
+        <div id="log1" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Production Backend (Railway)</h2>
+        <div class="test-url">https://bakalaurasfinal-production.up.railway.app/phishing-examples/bgs-security-email.png</div>
+        <button onclick="testImage('https://bakalaurasfinal-production.up.railway.app/phishing-examples/bgs-security-email.png', 'img2')">Test Image</button>
+        <div id="status2"></div>
+        <img id="img2" alt="BGS Security Email" onload="updateStatus('img2', 'status2', true)" onerror="updateStatus('img2', 'status2', false)">
+        <div id="log2" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: All Phishing Images</h2>
+        <button onclick="testAllImages()">Test All Images</button>
+        <div id="all-images"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Environment Information</h2>
+        <div id="env-info" class="log"></div>
+        <button onclick="showEnvInfo()">Refresh Info</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 What to Check in Browser Console</h2>
+        <ol>
+            <li>Open DevTools (F12)</li>
+            <li>Go to <strong>Console</strong> tab</li>
+            <li>Look for errors related to images or CORS</li>
+            <li>Go to <strong>Network</strong> tab</li>
+            <li>Filter by "Img"</li>
+            <li>Reload the page</li>
+            <li>Look for requests to <code>/phishing-examples/</code></li>
+            <li>Check the <strong>Status</strong> column (should be 200 for success)</li>
+            <li>Click on a failed request and check the <strong>Headers</strong> tab</li>
+        </ol>
+    </div>
+
+    <script>
+        const images = [
+            'bgs-security-email.png',
+            'bgs-security-website.png',
+            'office365-email.png',
+            'office365-website.png',
+            'sharefile-email.png',
+            'sharefile-website.png'
+        ];
+
+        function testImage(url, imgId) {
+            const img = document.getElementById(imgId);
+            const logId = imgId.replace('img', 'log');
+            const log = document.getElementById(logId);
+            
+            log.textContent = `Testing: ${url}\n`;
+            img.src = '';
+            
+            // Try to fetch first
+            fetch(url, { method: 'HEAD', mode: 'no-cors' })
+                .then(() => {
+                    log.textContent += 'HEAD request: Success (no CORS issues)\n';
+                })
+                .catch(err => {
+                    log.textContent += `HEAD request error: ${err.message}\n`;
+                });
+            
+            // Load the image
+            img.src = url + '?t=' + Date.now(); // Add timestamp to bypass cache
+        }
+
+        function updateStatus(imgId, statusId, success) {
+            const statusDiv = document.getElementById(statusId);
+            const img = document.getElementById(imgId);
+            const logId = imgId.replace('img', 'log');
+            const log = document.getElementById(logId);
+            
+            if (success) {
+                statusDiv.innerHTML = '<span class="status success">✅ Image loaded successfully</span>';
+                log.textContent += `Image loaded! Dimensions: ${img.naturalWidth}x${img.naturalHeight}\n`;
+            } else {
+                statusDiv.innerHTML = '<span class="status error">❌ Image failed to load</span>';
+                log.textContent += `Image failed to load. Check:\n`;
+                log.textContent += `1. Is the backend running?\n`;
+                log.textContent += `2. Is the URL correct?\n`;
+                log.textContent += `3. Are there CORS errors in console?\n`;
+                log.textContent += `4. Check Network tab for status code\n`;
+            }
+        }
+
+        function testAllImages() {
+            const container = document.getElementById('all-images');
+            container.innerHTML = '';
+            
+            const backendUrl = 'https://bakalaurasfinal-production.up.railway.app';
+            
+            images.forEach((filename, index) => {
+                const div = document.createElement('div');
+                div.className = 'test-section';
+                div.innerHTML = `
+                    <h3>${filename}</h3>
+                    <div class="test-url">${backendUrl}/phishing-examples/${filename}</div>
+                    <div id="status-all-${index}"></div>
+                    <img src="${backendUrl}/phishing-examples/${filename}" 
+                         alt="${filename}"
+                         onload="document.getElementById('status-all-${index}').innerHTML = '<span class=\\'status success\\'>✅ Loaded</span>'"
+                         onerror="document.getElementById('status-all-${index}').innerHTML = '<span class=\\'status error\\'>❌ Failed</span>'">
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function showEnvInfo() {
+            const info = document.getElementById('env-info');
+            info.textContent = `
+Current URL: ${window.location.href}
+Protocol: ${window.location.protocol}
+Host: ${window.location.host}
+User Agent: ${navigator.userAgent}
+Cookies Enabled: ${navigator.cookieEnabled}
+Online: ${navigator.onLine}
+            `.trim();
+        }
+
+        // Show env info on load
+        showEnvInfo();
+    </script>
+</body>
+</html>
+
