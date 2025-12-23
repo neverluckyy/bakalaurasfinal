@@ -5,6 +5,20 @@ import { ArrowLeft, BookOpen, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import './SectionLearn.css';
 
+// Helper to get backend URL for image fallback
+const getBackendImageUrl = (imagePath) => {
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  if (axios.defaults.baseURL) {
+    return `${axios.defaults.baseURL}${imagePath}`;
+  }
+  
+  // Fallback for production if baseURL not set
+  return `https://bakalaurasfinal-production.up.railway.app${imagePath}`;
+};
+
 // Helper function to get the correct image URL
 const getImageUrl = (imagePath) => {
   // If path already starts with http, return as-is
@@ -18,23 +32,9 @@ const getImageUrl = (imagePath) => {
     return `${backendUrl}${imagePath}`;
   }
   
-  // In production, use relative path first (served by Netlify from build folder)
-  // If that fails, the onError handler will try the backend URL
+  // In production, try relative path first (images may be in Netlify build)
+  // If that fails, onError handler will try backend URL as fallback
   return imagePath;
-};
-
-// Helper to get backend URL for image fallback
-const getBackendImageUrl = (imagePath) => {
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  
-  if (axios.defaults.baseURL) {
-    return `${axios.defaults.baseURL}${imagePath}`;
-  }
-  
-  // Fallback for production if baseURL not set
-  return `https://bakalaurasfinal-production.up.railway.app${imagePath}`;
 };
 
 const SectionLearn = () => {
@@ -388,17 +388,20 @@ const SectionLearn = () => {
                           console.error('Failed to load image from:', imageUrl);
                           console.error('Original path:', imagePath);
                           
+                          // Prevent infinite loop - check if we've already tried the backend
+                          if (e.target.dataset.fallbackAttempted === 'true') {
+                            console.error('Backend fallback also failed. Hiding image.');
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #8A8A9A;">Image not available: ${altText || 'Phishing example'}</div>`;
+                            return;
+                          }
+                          
                           // Try backend URL as fallback
                           const backendUrl = getBackendImageUrl(imagePath);
                           if (backendUrl !== imageUrl) {
                             console.log('Trying backend URL as fallback:', backendUrl);
+                            e.target.dataset.fallbackAttempted = 'true';
                             e.target.src = backendUrl;
-                            // Prevent infinite loop if backend also fails
-                            e.target.onerror = () => {
-                              console.error('Failed to load image from backend:', backendUrl);
-                              e.target.style.display = 'none';
-                              e.target.parentElement.style.display = 'none';
-                            };
                           } else {
                             console.error('No fallback available. Hiding image.');
                             e.target.style.display = 'none';
