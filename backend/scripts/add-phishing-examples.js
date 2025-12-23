@@ -62,24 +62,30 @@ async function addPhishingExamples() {
     console.log('');
 
     // Determine the order_index for the new content
-    // It should be after Key Concepts (order_index 2), so order_index 3
-    // But if there's already content at 3, we'll update that instead
+    // Place it at order_index 3, right after "Understanding social engineering tactics" (order_index 2)
+    // This way students see real examples early in their learning
     let targetOrderIndex = 3;
     const existingRealWorld = existingContent.find(item => item.screen_title === 'Real-World Examples');
     
     if (existingRealWorld) {
-      targetOrderIndex = existingRealWorld.order_index;
-      console.log(`⚠ Real-World Examples already exists at order_index ${targetOrderIndex}`);
-      console.log('  Will update existing content...');
+      // If it exists at a different position, we'll move it to position 3
+      if (existingRealWorld.order_index !== 3) {
+        console.log(`⚠ Real-World Examples exists at order_index ${existingRealWorld.order_index}`);
+        console.log('  Will move it to order_index 3 (right after Key Concepts)...');
+        targetOrderIndex = 3;
+      } else {
+        targetOrderIndex = 3;
+        console.log(`✓ Real-World Examples already at order_index ${targetOrderIndex}`);
+        console.log('  Will update existing content...');
+      }
     } else {
       // Check if order_index 3 is taken
       const order3Taken = existingContent.find(item => item.order_index === 3);
       if (order3Taken) {
         console.log(`⚠ Order index 3 is taken by: ${order3Taken.screen_title}`);
-        // Find the highest order_index and add 1
-        const maxOrder = Math.max(...existingContent.map(item => item.order_index));
-        targetOrderIndex = maxOrder + 1;
-        console.log(`  Will insert at order_index ${targetOrderIndex}`);
+        console.log('  Will need to shift content to make room...');
+        // We'll delete the existing one and insert at 3, shifting others
+        targetOrderIndex = 3;
       } else {
         console.log(`✓ Will insert at order_index ${targetOrderIndex}`);
       }
@@ -169,6 +175,35 @@ This phishing attempt uses the name "ShareFile" (a legitimate file-sharing servi
 5. **Never share credentials**: Legitimate services will never ask you to verify your password via email
 
 Remember: If an email seems suspicious, it probably is. When in doubt, don't click, and verify through a trusted channel.`;
+
+    // If we need to move to position 3 and it's taken, shift content first
+    if (targetOrderIndex === 3) {
+      const order3Content = existingContent.find(item => item.order_index === 3 && item.screen_title !== 'Real-World Examples');
+      if (order3Content) {
+        console.log('  Shifting content from position 3 onwards to make room...');
+        // Shift in reverse order to avoid unique constraint violations
+        const contentToShift = existingContent.filter(item => item.order_index >= 3 && item.screen_title !== 'Real-World Examples')
+          .sort((a, b) => b.order_index - a.order_index); // Sort descending
+        
+        for (const item of contentToShift) {
+          await new Promise((resolve, reject) => {
+            db.run(
+              'UPDATE learning_content SET order_index = ? WHERE id = (SELECT id FROM learning_content WHERE section_id = ? AND screen_title = ? LIMIT 1)',
+              [item.order_index + 1, section.id, item.screen_title],
+              function(err) {
+                if (err) {
+                  console.error(`Error shifting ${item.screen_title}:`, err.message);
+                  reject(err);
+                } else {
+                  resolve();
+                }
+              }
+            );
+          });
+        }
+        console.log('✓ Shifted existing content to make room');
+      }
+    }
 
     // Delete existing Real-World Examples if it exists
     if (existingRealWorld) {
