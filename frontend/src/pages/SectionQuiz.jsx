@@ -236,6 +236,13 @@ const SectionQuiz = () => {
         setAnswers(restoredAnswers);
         setScore(restoredScore);
         
+        // Debug: Log question data to help diagnose issues
+        if (randomizedQuestions.length > 0) {
+          console.log('Questions loaded:', randomizedQuestions.length);
+          console.log('First question data:', randomizedQuestions[0]);
+          console.log('Current question index:', restoredCurrentQuestion);
+        }
+        
         // Restore selected answer for current question if exists
         if (restoredAnswers[restoredCurrentQuestion] !== undefined) {
           setSelectedAnswer(restoredAnswers[restoredCurrentQuestion]);
@@ -626,6 +633,16 @@ const SectionQuiz = () => {
   }
 
   const currentQ = questions[currentQuestion];
+  
+  // Safety check: if currentQ is undefined, show error
+  if (!currentQ) {
+    return (
+      <div className="section-quiz-container">
+        <div className="error">Error: Question not found. Please refresh the page.</div>
+      </div>
+    );
+  }
+  
   const progress = ((currentQuestion + 1) / questions.length) * 100;
   const isAnswerCorrect = selectedAnswer === currentQ.correct_answer;
 
@@ -665,45 +682,49 @@ const SectionQuiz = () => {
           </div>
 
           <div className="question-text">
-            {currentQ.question_text}
+            {currentQ.question_text || 'Question text not available'}
           </div>
 
           <div className="answer-options">
-            {currentQ.options.map((option, index) => {
-              const isSelected = selectedAnswer === option;
-              const isCorrectAnswer = option === currentQ.correct_answer;
-              let optionClass = 'answer-option';
-              
-              if (answerSubmitted) {
-                if (isCorrectAnswer) {
-                  optionClass += ' correct';
-                } else if (isSelected && !isAnswerCorrect) {
-                  optionClass += ' incorrect';
+            {currentQ.options && Array.isArray(currentQ.options) && currentQ.options.length > 0 ? (
+              currentQ.options.map((option, index) => {
+                const isSelected = selectedAnswer === option;
+                const isCorrectAnswer = option === currentQ.correct_answer;
+                let optionClass = 'answer-option';
+                
+                if (answerSubmitted) {
+                  if (isCorrectAnswer) {
+                    optionClass += ' correct';
+                  } else if (isSelected && !isAnswerCorrect) {
+                    optionClass += ' incorrect';
+                  }
+                } else if (isSelected) {
+                  optionClass += ' selected';
                 }
-              } else if (isSelected) {
-                optionClass += ' selected';
-              }
 
-              return (
-                <button
-                  key={index}
-                  onClick={() => handleAnswerSelect(option)}
-                  className={optionClass}
-                  disabled={answerSubmitted}
-                >
-                  <div className="option-letter">
-                    {String.fromCharCode(65 + index)}
-                  </div>
-                  <div className="option-text">{option}</div>
-                  {answerSubmitted && isCorrectAnswer && (
-                    <CheckCircle size={16} className="correct-icon" />
-                  )}
-                  {answerSubmitted && isSelected && !isAnswerCorrect && (
-                    <XCircle size={16} className="incorrect-icon" />
-                  )}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleAnswerSelect(option)}
+                    className={optionClass}
+                    disabled={answerSubmitted}
+                  >
+                    <div className="option-letter">
+                      {String.fromCharCode(65 + index)}
+                    </div>
+                    <div className="option-text">{option}</div>
+                    {answerSubmitted && isCorrectAnswer && (
+                      <CheckCircle size={16} className="correct-icon" />
+                    )}
+                    {answerSubmitted && isSelected && !isAnswerCorrect && (
+                      <XCircle size={16} className="incorrect-icon" />
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="error">No answer options available for this question.</div>
+            )}
           </div>
 
           {showExplanation && (
