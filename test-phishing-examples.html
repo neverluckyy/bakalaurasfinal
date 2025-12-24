@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Phishing Examples Setup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        .test-section {
+            background: #282840;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #3a3a5a;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #1a1a2e;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { border-left: 4px solid #4CAF50; }
+        .error { border-left: 4px solid #f44336; }
+        .info { border-left: 4px solid #2196F3; }
+        h2 { color: #4CAF50; }
+        .status { display: inline-block; padding: 5px 10px; border-radius: 4px; margin-left: 10px; }
+        .status.success { background: #4CAF50; }
+        .status.error { background: #f44336; }
+        .status.warning { background: #ff9800; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Phishing Examples Setup Test</h1>
+    <p>Use this page to test and fix the phishing examples page and images.</p>
+
+    <div class="test-section">
+        <h2>1. Check All Sections</h2>
+        <p>See which sections exist and their IDs</p>
+        <button onclick="checkSections()">Check Sections</button>
+        <div id="sections-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Check Current Content State</h2>
+        <p>Check if the "Real-World Examples" page exists in Module 1, Section 1</p>
+        <button onclick="checkContent()">Check Content</button>
+        <div id="content-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Check Images Availability</h2>
+        <p>Verify which images exist on the server</p>
+        <button onclick="checkImages()">Check Images</button>
+        <div id="images-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Manually Create/Update Phishing Examples Page</h2>
+        <p>If the page is missing, click this to create it</p>
+        <button onclick="ensurePhishingExamples()">Create/Update Page</button>
+        <div id="ensure-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Test Image Loading</h2>
+        <p>Test if images can be loaded from the server</p>
+        <button onclick="testImageLoading()">Test Images</button>
+        <div id="image-test-result"></div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'https://bakalaurasfinal-production.up.railway.app';
+
+        async function checkSections() {
+            const resultDiv = document.getElementById('sections-result');
+            resultDiv.textContent = 'Loading...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/maintenance/sections`);
+                const data = await response.json();
+                
+                if (data.sections) {
+                    let html = '<strong>Found Sections:</strong>\n\n';
+                    data.sections.forEach(s => {
+                        html += `ID: ${s.id} | ${s.display_name} (Module: ${s.module_name}, Order: ${s.order_index}, Content: ${s.content_count} pages)\n`;
+                    });
+                    resultDiv.textContent = html;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}\n\nMake sure you're logged in or the endpoint doesn't require auth.`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function checkContent() {
+            const resultDiv = document.getElementById('content-result');
+            resultDiv.textContent = 'Loading...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/maintenance/check-content`);
+                const data = await response.json();
+                
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.examplesPage) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent += '\n\n✅ "Real-World Examples" page EXISTS!';
+                    if (data.examplesPage.has_images === 'yes') {
+                        resultDiv.textContent += '\n✅ Page has images in markdown!';
+                    } else {
+                        resultDiv.textContent += '\n⚠️ Page does NOT have images in markdown!';
+                    }
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent += '\n\n❌ "Real-World Examples" page is MISSING!';
+                    resultDiv.textContent += '\n\nClick "Create/Update Page" button to create it.';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function checkImages() {
+            const resultDiv = document.getElementById('images-result');
+            resultDiv.textContent = 'Loading...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/test-images`);
+                const data = await response.json();
+                
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.imagesExist) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent += '\n\n✅ All images exist on server!';
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent += '\n\n❌ Some images are missing!';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function ensurePhishingExamples() {
+            const resultDiv = document.getElementById('ensure-result');
+            resultDiv.textContent = 'Creating/updating page... This may take a few seconds...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/maintenance/ensure-phishing-examples`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent += '\n\n✅ Page created/updated successfully!';
+                    resultDiv.textContent += '\n\nRefresh the learning content page to see it.';
+                } else {
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}\n\n${error.stack || ''}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testImageLoading() {
+            const resultDiv = document.getElementById('image-test-result');
+            resultDiv.innerHTML = '<p>Testing image loading...</p>';
+
+            const images = [
+                'bgs-security-email.png',
+                'bgs-security-website.png',
+                'office365-email.png',
+                'office365-website.png',
+                'sharefile-email.png',
+                'sharefile-website.png'
+            ];
+
+            let html = '<div class="test-section"><h3>Image Loading Test Results:</h3>';
+            
+            for (const img of images) {
+                const imgUrl = `${BACKEND_URL}/phishing-examples/${img}`;
+                html += `<div style="margin: 10px 0;">
+                    <strong>${img}</strong>
+                    <img src="${imgUrl}" 
+                         style="max-width: 200px; display: block; margin: 5px 0; border: 1px solid #3a3a5a;"
+                         onload="this.nextElementSibling.textContent='✅ Loaded'; this.nextElementSibling.className='status success'"
+                         onerror="this.nextElementSibling.textContent='❌ Failed'; this.nextElementSibling.className='status error'; this.style.display='none'">
+                    <span class="status warning">Loading...</span>
+                    <br><small>URL: ${imgUrl}</small>
+                </div>`;
+            }
+            
+            html += '</div>';
+            resultDiv.innerHTML = html;
+        }
+
+        // Auto-run checks on load
+        window.addEventListener('load', () => {
+            console.log('Page loaded. Click buttons to test endpoints.');
+        });
+    </script>
+</body>
+</html>
+
