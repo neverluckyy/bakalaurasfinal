@@ -177,7 +177,7 @@ router.post('/login', async (req, res) => {
     }
     
     db.get(
-      'SELECT id, email, password_hash, display_name, avatar_key, total_xp, level, is_admin, email_verified FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, display_name, avatar_key, total_xp, level, is_admin, email_verified, email_verification_expires FROM users WHERE email = ?',
       [email],
       async (err, user) => {
         if (err) {
@@ -279,57 +279,24 @@ router.post('/login', async (req, res) => {
         
         res.cookie('token', token, cookieOptions);
 
-        // Get email verification expiration if not verified
-        let emailVerificationExpires = null;
-        if (!user.email_verified) {
-          db.get(
-            'SELECT email_verification_expires FROM users WHERE id = ?',
-            [user.id],
-            (err, verificationData) => {
-              if (err) {
-                console.error('Error fetching email verification expiration:', err);
-                // Continue anyway - we'll just set it to null
-              } else if (verificationData) {
-                emailVerificationExpires = verificationData.email_verification_expires;
-              }
-              
-              if (!res.headersSent) {
-                res.json({
-                  message: 'Login successful',
-                  token: token,
-                  user: {
-                    id: user.id,
-                    email: user.email,
-                    display_name: user.display_name,
-                    avatar_key: user.avatar_key,
-                    total_xp: user.total_xp,
-                    level: user.level,
-                    is_admin: user.is_admin || 0,
-                    email_verified: user.email_verified || 0,
-                    email_verification_expires: emailVerificationExpires
-                  }
-                });
-              }
+        // Send response with user data
+        // email_verification_expires is already included in the query above
+        if (!res.headersSent) {
+          res.json({
+            message: 'Login successful',
+            token: token,
+            user: {
+              id: user.id,
+              email: user.email,
+              display_name: user.display_name,
+              avatar_key: user.avatar_key,
+              total_xp: user.total_xp,
+              level: user.level,
+              is_admin: user.is_admin || 0,
+              email_verified: user.email_verified || 0,
+              email_verification_expires: user.email_verified ? null : (user.email_verification_expires || null)
             }
-          );
-        } else {
-          if (!res.headersSent) {
-            res.json({
-              message: 'Login successful',
-              token: token,
-              user: {
-                id: user.id,
-                email: user.email,
-                display_name: user.display_name,
-                avatar_key: user.avatar_key,
-                total_xp: user.total_xp,
-                level: user.level,
-                is_admin: user.is_admin || 0,
-                email_verified: user.email_verified || 0,
-                email_verification_expires: null
-              }
-            });
-          }
+          });
         }
       }
     );

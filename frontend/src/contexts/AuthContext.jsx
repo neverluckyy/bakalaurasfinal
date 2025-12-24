@@ -49,27 +49,59 @@ export function AuthProvider({ children }) {
     try {
       const response = await axios.post('/api/auth/login', 
         { email, password }, 
-        { withCredentials: true }
+        { 
+          withCredentials: true,
+          timeout: 10000 // 10 second timeout
+        }
       );
       
       // Store token in localStorage if provided
-      if (response.data.token) {
+      if (response.data && response.data.token) {
         localStorage.setItem('authToken', response.data.token);
       }
       
-      setUser(response.data.user);
+      // Set user data if provided
+      if (response.data && response.data.user) {
+        setUser(response.data.user);
+      } else {
+        // If no user data in response, check auth status
+        await checkAuth();
+      }
+      
       return { success: true };
     } catch (error) {
+      console.error('Login error:', error);
+      console.error('Error response:', error.response);
+      
+      // Handle timeout errors
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        return { 
+          success: false, 
+          error: 'Request timed out. Please try again.'
+        };
+      }
+      
+      // Handle network errors
+      if (!error.response) {
+        return { 
+          success: false, 
+          error: 'Network error. Please check your connection and try again.'
+        };
+      }
+      
       // Handle rate limit errors specifically
-      if (error.response?.status === 429) {
+      if (error.response.status === 429) {
         return { 
           success: false, 
           error: 'Too many login attempts. Please wait a moment and try again.'
         };
       }
+      
+      // Handle other HTTP errors
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Login failed. Please check your credentials.';
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed'
+        error: errorMessage
       };
     }
   };
