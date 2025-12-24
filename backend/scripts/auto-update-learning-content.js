@@ -224,16 +224,26 @@ async function autoUpdate() {
             }
             
             function deleteAndInsert() {
-              // Delete ALL learning content for this section
-              db.run('DELETE FROM learning_content WHERE section_id = ?', [sectionId], (err) => {
-                if (err) {
-                  console.error('[Auto-Update] Error deleting content:', err);
-                  reject(err);
-                  return;
-                }
-                
-                // Build Introduction WITHOUT references
-                const introductionContent = `Welcome to the **Phishing and Social Engineering** section!
+              // Save the "Real-World Examples" page if it exists before deleting
+              db.get('SELECT * FROM learning_content WHERE section_id = ? AND screen_title = ?', 
+                [sectionId, 'Real-World Examples'], (err, examplesPage) => {
+                  if (err) {
+                    console.error('[Auto-Update] Error checking for Real-World Examples:', err);
+                    // Continue anyway
+                  }
+                  
+                  const savedExamplesPage = examplesPage; // Save for later restoration
+                  
+                  // Delete ALL learning content for this section (we'll restore Real-World Examples after)
+                  db.run('DELETE FROM learning_content WHERE section_id = ?', [sectionId], (err) => {
+                    if (err) {
+                      console.error('[Auto-Update] Error deleting content:', err);
+                      reject(err);
+                      return;
+                    }
+                    
+                    // Build Introduction WITHOUT references
+                    const introductionContent = `Welcome to the **Phishing and Social Engineering** section!
 
 This section will help you understand how attackers use psychological manipulation to trick people into revealing sensitive information or taking actions that compromise security.
 
@@ -242,62 +252,84 @@ You'll learn about:
 • Different types of social engineering attacks (phishing, vishing, smishing, pretexting, baiting, tailgating)
 • The psychological tactics attackers use
 • How to recognize and respond to these threats safely`;
-                
-                // Insert Introduction (without references)
-                db.run(
-                  'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
-                  [sectionId, 'Introduction', 2, introductionContent, 1],
-                  function(err) {
-                    if (err) {
-                      console.error('[Auto-Update] Error inserting Introduction:', err);
-                      reject(err);
-                      return;
-                    }
                     
-                    console.log('[Auto-Update] ✓ Inserted Introduction (without references)');
-                    
-                    // Insert individual concept pages (one per concept)
-                    let currentOrderIndex = 2;
-                    let insertCount = 0;
-                    
-                    function insertNextConcept(index) {
-                      if (index >= csvData.length) {
-                        console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
-                        console.log('[Auto-Update] ✅ Learning content updated successfully!');
-                        resolve(true);
-                        return;
-                      }
-                      
-                      const row = csvData[index];
-                      const topic = row['Topic'] || row.Topic;
-                      const conceptContent = formatContent(row);
-                      
-                      const wordCount = conceptContent.split(/\s+/).length;
-                      const readTime = Math.max(1, Math.ceil(wordCount / 200));
-                      
-                      db.run(
-                        'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
-                        [sectionId, topic, readTime, conceptContent, currentOrderIndex],
-                        function(err) {
-                          if (err) {
-                            console.error(`[Auto-Update] Error inserting concept "${topic}":`, err);
-                            reject(err);
+                    // Insert Introduction (without references)
+                    db.run(
+                      'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
+                      [sectionId, 'Introduction', 2, introductionContent, 1],
+                      function(err) {
+                        if (err) {
+                          console.error('[Auto-Update] Error inserting Introduction:', err);
+                          reject(err);
+                          return;
+                        }
+                        
+                        console.log('[Auto-Update] ✓ Inserted Introduction (without references)');
+                        
+                        // Insert individual concept pages (one per concept)
+                        let currentOrderIndex = 2;
+                        let insertCount = 0;
+                        
+                        function insertNextConcept(index) {
+                          if (index >= csvData.length) {
+                            // All concepts inserted, now restore Real-World Examples if it existed
+                            if (savedExamplesPage) {
+                              // Place it after all concept pages (order_index = 1 + 8 concepts + 1 = 10)
+                              const examplesOrderIndex = currentOrderIndex;
+                              db.run(
+                                'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
+                                [sectionId, savedExamplesPage.screen_title, savedExamplesPage.read_time_min, savedExamplesPage.content_markdown, examplesOrderIndex],
+                                function(err) {
+                                  if (err) {
+                                    console.error('[Auto-Update] Error restoring Real-World Examples:', err);
+                                    // Don't fail - just log the error
+                                  } else {
+                                    console.log('[Auto-Update] ✓ Restored "Real-World Examples" page');
+                                  }
+                                  console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
+                                  console.log('[Auto-Update] ✅ Learning content updated successfully!');
+                                  resolve(true);
+                                }
+                              );
+                            } else {
+                              console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
+                              console.log('[Auto-Update] ✅ Learning content updated successfully!');
+                              resolve(true);
+                            }
                             return;
                           }
                           
-                          insertCount++;
-                          console.log(`[Auto-Update] ✓ Created page ${insertCount}: "${topic}"`);
-                          currentOrderIndex++;
+                          const row = csvData[index];
+                          const topic = row['Topic'] || row.Topic;
+                          const conceptContent = formatContent(row);
                           
-                          insertNextConcept(index + 1);
+                          const wordCount = conceptContent.split(/\s+/).length;
+                          const readTime = Math.max(1, Math.ceil(wordCount / 200));
+                          
+                          db.run(
+                            'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
+                            [sectionId, topic, readTime, conceptContent, currentOrderIndex],
+                            function(err) {
+                              if (err) {
+                                console.error(`[Auto-Update] Error inserting concept "${topic}":`, err);
+                                reject(err);
+                                return;
+                              }
+                              
+                              insertCount++;
+                              console.log(`[Auto-Update] ✓ Created page ${insertCount}: "${topic}"`);
+                              currentOrderIndex++;
+                              
+                              insertNextConcept(index + 1);
+                            }
+                          );
                         }
-                      );
-                    }
-                    
-                    insertNextConcept(0);
-                  }
-                );
-              });
+                        
+                        insertNextConcept(0);
+                      }
+                    );
+                  });
+                });
             }
           });
         } catch (checkErr) {
