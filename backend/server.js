@@ -38,6 +38,13 @@ let allowedOrigins = [];
 if (process.env.ALLOWED_ORIGINS) {
   // If ALLOWED_ORIGINS is set, use it and also add Netlify pattern
   allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
+  // Always ensure sensebait.pro domains are included
+  if (!allowedOrigins.includes('https://sensebait.pro')) {
+    allowedOrigins.push('https://sensebait.pro');
+  }
+  if (!allowedOrigins.includes('https://www.sensebait.pro')) {
+    allowedOrigins.push('https://www.sensebait.pro');
+  }
   // Always add Netlify pattern when ALLOWED_ORIGINS is set
   allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
 } else if (process.env.NODE_ENV === 'production') {
@@ -76,6 +83,9 @@ app.use(cors({
     if (isAllowed) {
       callback(null, true);
     } else {
+      // Log CORS rejection for debugging
+      console.log(`CORS blocked request from origin: ${origin}`);
+      console.log(`Allowed origins:`, allowedOrigins);
       // Return false instead of error to let CORS send proper response
       callback(null, false);
     }
@@ -267,6 +277,7 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
+      console.log('CORS Allowed Origins:', allowedOrigins);
       console.log('Routes registered:');
       console.log('  - /api/health');
       console.log('  - /api/test');
