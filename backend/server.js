@@ -234,6 +234,35 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Test endpoint to verify images are accessible
+app.get('/api/test-images', (req, res) => {
+  const requiredImages = [
+    'bgs-security-email.png',
+    'bgs-security-website.png',
+    'office365-email.png',
+    'office365-website.png',
+    'sharefile-email.png',
+    'sharefile-website.png'
+  ];
+  
+  const results = requiredImages.map(imageName => {
+    const imagePath = path.join(phishingExamplesPath, imageName);
+    const exists = fs.existsSync(imagePath);
+    return {
+      name: imageName,
+      exists: exists,
+      path: imagePath,
+      url: `/phishing-examples/${imageName}`
+    };
+  });
+  
+  res.json({
+    imagesPath: phishingExamplesPath,
+    imagesExist: results.every(r => r.exists),
+    images: results
+  });
+});
+
 // Error handling middleware - but don't interfere with CORS errors
 app.use((err, req, res, next) => {
   // If this is a CORS error, let CORS middleware handle it
