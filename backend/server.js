@@ -55,45 +55,36 @@ if (process.env.ALLOWED_ORIGINS) {
 }
 
 // CORS middleware - must be before routes
+// CORS configuration - SIMPLIFIED and WORKING
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
-      console.log('CORS: Allowing request with no origin');
       return callback(null, true);
     }
-    
-    console.log(`CORS: Checking origin: ${origin}`);
-    console.log(`CORS: Allowed origins:`, allowedOrigins);
     
     // Check if origin is in allowed list
     const isAllowed = allowedOrigins.some(allowed => {
       if (typeof allowed === 'string') {
-        const matches = origin === allowed;
-        if (matches) console.log(`CORS: Matched string origin: ${allowed}`);
-        return matches;
+        return origin === allowed;
       } else if (allowed instanceof RegExp) {
-        const matches = allowed.test(origin);
-        if (matches) console.log(`CORS: Matched regex origin: ${allowed}`);
-        return matches;
+        return allowed.test(origin);
       }
       return false;
     });
     
     if (isAllowed) {
-      console.log(`CORS: ✅ Allowing origin: ${origin}`);
       callback(null, true);
     } else {
-      console.warn(`CORS: ❌ Blocked origin: ${origin}`);
-      callback(new Error(`Not allowed by CORS: ${origin}`));
+      // Return false instead of error to let CORS send proper response
+      callback(null, false);
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200, // Some legacy browsers (IE11) choke on 204
-  preflightContinue: false // Let cors handle preflight
+  optionsSuccessStatus: 200
 }));
 
 // Rate limiting for auth routes (stricter for login/register)
@@ -168,8 +159,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Error handling middleware
+// Error handling middleware - but don't interfere with CORS errors
 app.use((err, req, res, next) => {
+  // If this is a CORS error, let CORS middleware handle it
+  if (err.message && err.message.includes('CORS')) {
+    return next(err); // Pass to default CORS error handler
+  }
+  
   console.error('Error middleware caught:', err);
   console.error('Stack:', err.stack);
   if (!res.headersSent) {
