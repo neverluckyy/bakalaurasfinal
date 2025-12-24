@@ -35,69 +35,40 @@ app.set('trust proxy', 1);
 // Explicitly allow both custom domain and Netlify subdomain
 let allowedOrigins = [];
 
+// Always include sensebait.pro domains regardless of environment
+const sensebaitOrigins = ['https://sensebait.pro', 'https://www.sensebait.pro'];
+
 if (process.env.ALLOWED_ORIGINS) {
-  // If ALLOWED_ORIGINS is set, use it and also add Netlify pattern
+  // If ALLOWED_ORIGINS is set, use it and also add sensebait.pro and Netlify pattern
   allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
   // Always ensure sensebait.pro domains are included
-  if (!allowedOrigins.includes('https://sensebait.pro')) {
-    allowedOrigins.push('https://sensebait.pro');
-  }
-  if (!allowedOrigins.includes('https://www.sensebait.pro')) {
-    allowedOrigins.push('https://www.sensebait.pro');
-  }
+  sensebaitOrigins.forEach(origin => {
+    if (!allowedOrigins.includes(origin)) {
+      allowedOrigins.push(origin);
+    }
+  });
   // Always add Netlify pattern when ALLOWED_ORIGINS is set
   allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
-} else if (process.env.NODE_ENV === 'production') {
-  // Default production origins
+} else if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
+  // Default production origins (Railway sets RAILWAY_ENVIRONMENT)
   allowedOrigins = [
-    'https://sensebait.pro', 
-    'https://www.sensebait.pro',
+    ...sensebaitOrigins,
     'https://beamish-granita-b7abb8.netlify.app' // Explicit Netlify subdomain
   ];
   // Allow all Netlify subdomains via regex pattern
   allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
 } else {
   // Development
-  allowedOrigins = ['http://localhost:3000'];
+  allowedOrigins = ['http://localhost:3000', ...sensebaitOrigins];
 }
 
-// Handle OPTIONS requests explicitly before CORS middleware
-// This ensures preflight requests are handled correctly
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  
-  console.log(`OPTIONS preflight request from origin: ${origin}`);
-  
-  // Check if origin is allowed
-  if (origin) {
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (typeof allowed === 'string') {
-        return origin === allowed;
-      } else if (allowed instanceof RegExp) {
-        return allowed.test(origin);
-      }
-      return false;
-    });
-    
-    if (isAllowed) {
-      res.header('Access-Control-Allow-Origin', origin);
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      res.header('Access-Control-Max-Age', '86400'); // 24 hours
-      return res.sendStatus(200);
-    } else {
-      console.log(`OPTIONS preflight BLOCKED for origin: ${origin}`);
-      console.log(`Allowed origins:`, allowedOrigins);
-    }
-  }
-  
-  // Always return 200 for OPTIONS - let CORS middleware handle actual requests
-  res.sendStatus(200);
-});
+// Log allowed origins on startup for debugging
+console.log('CORS Allowed Origins:', allowedOrigins);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('RAILWAY_ENVIRONMENT:', process.env.RAILWAY_ENVIRONMENT);
 
-// CORS middleware - must be before routes
-// CORS configuration - SIMPLIFIED and WORKING
+// CORS middleware - must be before routes and rate limiting
+// Configure CORS to handle both preflight and actual requests
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -116,6 +87,7 @@ app.use(cors({
     });
     
     if (isAllowed) {
+      console.log(`CORS allowed request from origin: ${origin}`);
       callback(null, true);
     } else {
       // Log CORS rejection for debugging
