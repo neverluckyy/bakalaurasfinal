@@ -171,6 +171,33 @@ async function startServer() {
     await initDatabase();
     console.log('Database initialized successfully');
     
+    // Ensure phishing examples page exists on startup (always run in production)
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Ensuring phishing examples page exists...');
+      try {
+        const ensureScriptPath = path.join(__dirname, 'scripts', 'ensure-phishing-examples-on-railway');
+        const ensureFullPath = ensureScriptPath + '.js';
+        
+        if (fs.existsSync(ensureFullPath)) {
+          // Import the function from the script
+          const ensurePhishingExamples = require(ensureScriptPath);
+          // Run asynchronously so it doesn't block server startup
+          ensurePhishingExamples()
+            .then(() => {
+              console.log('✅ Phishing examples page ensured on startup');
+            })
+            .catch(err => {
+              console.error('⚠️  Failed to ensure phishing examples page (non-fatal):', err.message);
+              // Don't crash the server if this fails
+            });
+        } else {
+          console.warn('⚠️  Ensure phishing examples script not found');
+        }
+      } catch (err) {
+        console.warn('⚠️  Error ensuring phishing examples page:', err.message);
+      }
+    }
+    
     // Optional: Auto-update learning content on startup
     // Set AUTO_UPDATE_LEARNING_CONTENT=true in Railway environment variables to enable
     if (process.env.AUTO_UPDATE_LEARNING_CONTENT === 'true') {

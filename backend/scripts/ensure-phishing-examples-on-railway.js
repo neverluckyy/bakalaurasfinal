@@ -198,14 +198,27 @@ Remember: If an email seems suspicious, it probably is. When in doubt, don't cli
     console.log('='.repeat(80));
     console.log('');
 
-    process.exit(0);
+    return { success: true, action: existingPage ? 'updated' : 'created' };
   } catch (error) {
     console.error('');
     console.error('❌ Error:', error.message);
     console.error(error);
-    process.exit(1);
+    throw error;
   }
 }
 
-ensurePhishingExamples();
+// Export the function for use in server.js
+module.exports = ensurePhishingExamples;
+
+// If run directly (not imported), execute it
+if (require.main === module) {
+  ensurePhishingExamples()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Fatal error:', error);
+      process.exit(1);
+    });
+}
 
