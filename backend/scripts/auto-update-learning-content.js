@@ -271,34 +271,43 @@ You'll learn about:
                         let insertCount = 0;
                         
                         function insertNextConcept(index) {
-                          if (index >= csvData.length) {
-                            // All concepts inserted, now restore Real-World Examples if it existed
-                            if (savedExamplesPage) {
-                              // Place it after all concept pages (order_index = 1 + 8 concepts + 1 = 10)
-                              const examplesOrderIndex = currentOrderIndex;
-                              db.run(
-                                'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
-                                [sectionId, savedExamplesPage.screen_title, savedExamplesPage.read_time_min, savedExamplesPage.content_markdown, examplesOrderIndex],
-                                function(err) {
-                                  if (err) {
-                                    console.error('[Auto-Update] Error restoring Real-World Examples:', err);
-                                    // Don't fail - just log the error
-                                  } else {
-                                    console.log('[Auto-Update] ✓ Restored "Real-World Examples" page');
-                                  }
-                                  console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
-                                  console.log('[Auto-Update] ✅ Learning content updated successfully!');
-                                  resolve(true);
+                          // Insert Real-World Examples at position 9 (after 7 concepts, before the 8th)
+                          if (index === 7 && savedExamplesPage) {
+                            // Insert Real-World Examples at order_index 9 (after 7 concepts + Introduction = 8 pages)
+                            const examplesOrderIndex = 9;
+                            db.run(
+                              'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
+                              [sectionId, savedExamplesPage.screen_title, savedExamplesPage.read_time_min, savedExamplesPage.content_markdown, examplesOrderIndex],
+                              function(err) {
+                                if (err) {
+                                  console.error('[Auto-Update] Error restoring Real-World Examples:', err);
+                                  // Don't fail - just log the error and continue
+                                } else {
+                                  console.log('[Auto-Update] ✓ Restored "Real-World Examples" page at position 9');
                                 }
-                              );
-                            } else {
-                              console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
-                              console.log('[Auto-Update] ✅ Learning content updated successfully!');
-                              resolve(true);
-                            }
+                                // Continue with the 8th concept at position 10
+                                insertConceptAt(index, 10);
+                              }
+                            );
                             return;
                           }
                           
+                          if (index >= csvData.length) {
+                            // All concepts inserted
+                            if (!savedExamplesPage) {
+                              // If we didn't insert it yet (shouldn't happen, but handle it)
+                              console.log('[Auto-Update] Note: Real-World Examples page was not found to restore');
+                            }
+                            console.log(`[Auto-Update] ✓ Successfully created ${insertCount} separate concept pages`);
+                            console.log('[Auto-Update] ✅ Learning content updated successfully!');
+                            resolve(true);
+                            return;
+                          }
+                          
+                          insertConceptAt(index, currentOrderIndex);
+                        }
+                        
+                        function insertConceptAt(index, orderIndex) {
                           const row = csvData[index];
                           const topic = row['Topic'] || row.Topic;
                           const conceptContent = formatContent(row);
@@ -308,7 +317,7 @@ You'll learn about:
                           
                           db.run(
                             'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
-                            [sectionId, topic, readTime, conceptContent, currentOrderIndex],
+                            [sectionId, topic, readTime, conceptContent, orderIndex],
                             function(err) {
                               if (err) {
                                 console.error(`[Auto-Update] Error inserting concept "${topic}":`, err);
@@ -317,8 +326,19 @@ You'll learn about:
                               }
                               
                               insertCount++;
-                              console.log(`[Auto-Update] ✓ Created page ${insertCount}: "${topic}"`);
-                              currentOrderIndex++;
+                              console.log(`[Auto-Update] ✓ Created page ${insertCount}: "${topic}" at position ${orderIndex}`);
+                              
+                              // Calculate next order index
+                              let nextOrderIndex;
+                              if (index < 7) {
+                                // First 7 concepts: 2, 3, 4, 5, 6, 7, 8
+                                nextOrderIndex = orderIndex + 1;
+                              } else if (index === 7) {
+                                // 8th concept goes after Real-World Examples (position 10)
+                                nextOrderIndex = 10;
+                              } else {
+                                nextOrderIndex = orderIndex + 1;
+                              }
                               
                               insertNextConcept(index + 1);
                             }
