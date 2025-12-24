@@ -51,31 +51,46 @@ if (process.env.ALLOWED_ORIGINS) {
   allowedOrigins = ['http://localhost:3000'];
 }
 
+// CORS middleware - must be before routes
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
+    
+    console.log(`CORS: Checking origin: ${origin}`);
+    console.log(`CORS: Allowed origins:`, allowedOrigins);
     
     // Check if origin is in allowed list
-    if (allowedOrigins.some(allowed => {
+    const isAllowed = allowedOrigins.some(allowed => {
       if (typeof allowed === 'string') {
-        return origin === allowed;
+        const matches = origin === allowed;
+        if (matches) console.log(`CORS: Matched string origin: ${allowed}`);
+        return matches;
       } else if (allowed instanceof RegExp) {
-        return allowed.test(origin);
+        const matches = allowed.test(origin);
+        if (matches) console.log(`CORS: Matched regex origin: ${allowed}`);
+        return matches;
       }
       return false;
-    })) {
+    });
+    
+    if (isAllowed) {
+      console.log(`CORS: ✅ Allowing origin: ${origin}`);
       callback(null, true);
     } else {
-      console.warn(`CORS blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      console.warn(`CORS: ❌ Blocked origin: ${origin}`);
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200 // Some legacy browsers (IE11) choke on 204
+  optionsSuccessStatus: 200, // Some legacy browsers (IE11) choke on 204
+  preflightContinue: false // Let cors handle preflight
 }));
 
 // Rate limiting for auth routes (stricter for login/register)
