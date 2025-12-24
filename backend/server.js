@@ -61,6 +61,41 @@ if (process.env.ALLOWED_ORIGINS) {
   allowedOrigins = ['http://localhost:3000'];
 }
 
+// Handle OPTIONS requests explicitly before CORS middleware
+// This ensures preflight requests are handled correctly
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  
+  console.log(`OPTIONS preflight request from origin: ${origin}`);
+  
+  // Check if origin is allowed
+  if (origin) {
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin === allowed;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Max-Age', '86400'); // 24 hours
+      return res.sendStatus(200);
+    } else {
+      console.log(`OPTIONS preflight BLOCKED for origin: ${origin}`);
+      console.log(`Allowed origins:`, allowedOrigins);
+    }
+  }
+  
+  // Always return 200 for OPTIONS - let CORS middleware handle actual requests
+  res.sendStatus(200);
+});
+
 // CORS middleware - must be before routes
 // CORS configuration - SIMPLIFIED and WORKING
 app.use(cors({
@@ -94,7 +129,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  preflightContinue: false,
+  maxAge: 86400 // Cache preflight for 24 hours
 }));
 
 // Rate limiting for auth routes (stricter for login/register)
@@ -104,7 +141,10 @@ const authLimiter = rateLimit({
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === '/me' // Skip rate limiting for /me endpoint (handled separately)
+  skip: (req) => {
+    // Skip rate limiting for OPTIONS requests (preflight) and /me endpoint
+    return req.method === 'OPTIONS' || req.path === '/me';
+  }
 });
 
 // Body parsing middleware
