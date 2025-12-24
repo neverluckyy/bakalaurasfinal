@@ -330,8 +330,11 @@ async function startServer() {
       }
     }
     
-    app.listen(PORT, () => {
-      console.log(`✅ Server running on port ${PORT}`);
+    // Railway requires binding to 0.0.0.0 to accept connections from the proxy
+    const HOST = process.env.RAILWAY_ENVIRONMENT ? '0.0.0.0' : 'localhost';
+    
+    app.listen(PORT, HOST, () => {
+      console.log(`✅ Server running on ${HOST}:${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
       console.log('CORS Allowed Origins:', allowedOrigins);
       console.log('Routes registered:');
