@@ -5,7 +5,14 @@ const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config({ path: './config.env' });
+// Load environment variables - try config.env first, then fall back to default .env behavior
+// On Railway, environment variables are set directly, so this won't fail if file doesn't exist
+try {
+  require('dotenv').config({ path: './config.env' });
+} catch (err) {
+  // If config.env doesn't exist, try default .env file (for local development)
+  require('dotenv').config();
+}
 
 const authRoutes = require('./routes/auth');
 const moduleRoutes = require('./routes/modules');
@@ -210,7 +217,7 @@ app.use((err, req, res, next) => {
   if (!res.headersSent) {
     res.status(500).json({ 
       error: 'Something went wrong!',
-      message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+      message: (process.env.NODE_ENV === 'development' || !process.env.RAILWAY_ENVIRONMENT) ? err.message : 'Internal server error'
     });
   }
 });
@@ -230,7 +237,8 @@ async function startServer() {
     console.log('Database initialized successfully');
     
     // Ensure phishing examples page exists on startup (always run in production)
-    if (process.env.NODE_ENV === 'production') {
+    // Use same production detection logic as CORS config
+    if (isProduction) {
       console.log('Ensuring phishing examples page exists...');
       try {
         const ensureScriptPath = path.join(__dirname, 'scripts', 'ensure-phishing-examples-on-railway');
