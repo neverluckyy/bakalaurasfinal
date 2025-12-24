@@ -8,13 +8,13 @@
 
 # IMPORTANT: Order matters! More specific rules should come first
 
-# Proxy phishing-examples to backend as fallback if not found in build
-# This ensures images work from backend if they're not in Netlify build
+# Proxy phishing-examples to backend
+# Always proxy to backend since images are served from Railway, not in Netlify build
 [[redirects]]
   from = "/phishing-examples/*"
   to = "https://bakalaurasfinal-production.up.railway.app/phishing-examples/:splat"
   status = 200
-  force = false
+  force = true
 
 # Proxy API requests to Railway backend
 [[redirects]]

@@ -5,21 +5,14 @@ import { ArrowLeft, BookOpen, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import './SectionLearn.css';
 
-// Helper to get backend URL for images
+// Helper to get backend URL for images (fallback)
 const getBackendImageUrl = (imagePath) => {
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
   
-  // In production, always use the Railway backend URL directly
-  // This ensures images load correctly even if REACT_APP_API_URL is not set
-  if (process.env.NODE_ENV === 'production') {
-    return `https://bakalaurasfinal-production.up.railway.app${imagePath}`;
-  }
-  
-  // In development, use axios baseURL if set, otherwise localhost
-  const baseURL = axios.defaults.baseURL || 'http://localhost:5000';
-  return `${baseURL}${imagePath}`;
+  // Use Railway backend URL directly
+  return `https://bakalaurasfinal-production.up.railway.app${imagePath}`;
 };
 
 // Helper function to get the correct image URL
@@ -29,9 +22,16 @@ const getImageUrl = (imagePath) => {
     return imagePath;
   }
   
-  // In both development and production, images are served by backend
-  // Use backend URL directly to ensure images load reliably
-  return getBackendImageUrl(imagePath);
+  // In production (Netlify), use relative path first
+  // Netlify proxy will forward /phishing-examples/* to Railway backend
+  // This avoids CORS issues since it's same-origin from browser perspective
+  if (process.env.NODE_ENV === 'production') {
+    return imagePath; // Use relative path - Netlify proxy handles it
+  }
+  
+  // In development, use backend URL directly
+  const baseURL = axios.defaults.baseURL || 'http://localhost:5000';
+  return `${baseURL}${imagePath}`;
 };
 
 const SectionLearn = () => {
@@ -403,14 +403,14 @@ const SectionLearn = () => {
                             return;
                           }
                           
-                          // Try backend URL as fallback
-                          const backendUrl = getBackendImageUrl(imagePath);
-                          if (backendUrl !== imageUrl) {
-                            console.log('🔄 Trying backend URL as fallback:', backendUrl);
+                          // In production, if relative path failed, try direct backend URL as fallback
+                          if (process.env.NODE_ENV === 'production' && imageUrl === imagePath) {
+                            const backendUrl = getBackendImageUrl(imagePath);
+                            console.log('🔄 Netlify proxy failed, trying direct backend URL:', backendUrl);
                             e.target.dataset.fallbackAttempted = 'true';
                             e.target.src = backendUrl;
                           } else {
-                            console.error('❌ No fallback available (both URLs are the same).');
+                            console.error('❌ No fallback available.');
                             e.target.style.display = 'none';
                             e.target.parentElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #8A8A9A;">Image not available: ${altText || 'Phishing example'}<br/><small>Check browser console for details</small></div>`;
                           }
