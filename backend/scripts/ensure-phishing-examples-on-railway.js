@@ -208,45 +208,54 @@ This attack attempts to steal your credentials by impersonating ShareFile (a leg
 
 Remember: If an email seems suspicious, it probably is. When in doubt, don't click, and verify through a trusted channel you initiate yourself.`;
 
-    // Determine order_index
-    // Get the max order_index for this section to place it at the end (before final page if exists)
-    const maxOrderResult = await new Promise((resolve, reject) => {
-      db.get(
-        'SELECT MAX(order_index) as max_order FROM learning_content WHERE section_id = ?',
-        [section.id],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
-        }
-      );
-    });
+    // Determine order_index - place at position 9 (after 7 concepts, before the 8th concept)
+    let orderIndex = 9;
     
-    // If page exists, keep its order_index, otherwise place it before the last page
-    // If max_order is 3 or less, use max_order + 1, otherwise use max_order (insert before last)
-    let orderIndex;
     if (existingPage) {
-      orderIndex = existingPage.order_index;
-    } else {
-      const maxOrder = maxOrderResult.max_order || 0;
-      // Place it as the second-to-last page (before the final page)
-      // If there are pages, use max_order, otherwise use 3
-      orderIndex = maxOrder > 0 ? maxOrder : 3;
-      
-      // If we're inserting before the last page, we need to shift the last page
-      if (maxOrder > 0) {
-        // Shift the last page's order_index by 1
-        await new Promise((resolve, reject) => {
-          db.run(
-            'UPDATE learning_content SET order_index = order_index + 1 WHERE section_id = ? AND order_index = ?',
-            [section.id, maxOrder],
-            function(err) {
-              if (err) reject(err);
-              else resolve();
-            }
-          );
-        });
-        console.log(`✓ Shifted last page (order_index ${maxOrder}) to ${maxOrder + 1}`);
+      // If page exists but not at position 9, we need to move it
+      if (existingPage.order_index !== 9) {
+        console.log(`⚠️  Page exists at position ${existingPage.order_index}, moving to position 9`);
+        
+        // Shift other pages to make room
+        if (existingPage.order_index < 9) {
+          // Move pages between current position and 9 down by 1
+          await new Promise((resolve, reject) => {
+            db.run(
+              'UPDATE learning_content SET order_index = order_index - 1 WHERE section_id = ? AND order_index > ? AND order_index < 9 AND id != ?',
+              [section.id, existingPage.order_index, existingPage.id],
+              function(err) {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+        } else if (existingPage.order_index > 9) {
+          // Move pages at 9 and above (but not the page itself) up by 1
+          await new Promise((resolve, reject) => {
+            db.run(
+              'UPDATE learning_content SET order_index = order_index + 1 WHERE section_id = ? AND order_index >= 9 AND order_index < ? AND id != ?',
+              [section.id, existingPage.order_index, existingPage.id],
+              function(err) {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+        }
       }
+    } else {
+      // New page - shift pages at position 9 and above up by 1
+      await new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE learning_content SET order_index = order_index + 1 WHERE section_id = ? AND order_index >= 9',
+          [section.id],
+          function(err) {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+      console.log(`✓ Shifted pages at position 9+ up by 1 to make room for Real-World Examples`);
     }
 
     if (existingPage) {
