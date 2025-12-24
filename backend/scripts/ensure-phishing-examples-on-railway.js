@@ -15,10 +15,11 @@ async function ensurePhishingExamples() {
     await initDatabase();
     const db = getDatabase();
 
-    // Find Module 1, Section 1
-    const section = await new Promise((resolve, reject) => {
+    // Find Module 1, Section 1 (Phishing and Social Engineering)
+    // Try multiple queries to find the section - be more flexible
+    let section = await new Promise((resolve, reject) => {
       db.get(`
-        SELECT s.id, s.display_name
+        SELECT s.id, s.display_name, s.order_index, m.id as module_id
         FROM sections s 
         JOIN modules m ON s.module_id = m.id 
         WHERE m.display_name = 'Security Awareness Essentials' 
@@ -29,6 +30,23 @@ async function ensurePhishingExamples() {
         else resolve(row);
       });
     });
+    
+    // If not found, try without order_index constraint
+    if (!section) {
+      console.log('⚠️  Section not found with order_index=1, trying without order_index...');
+      section = await new Promise((resolve, reject) => {
+        db.get(`
+          SELECT s.id, s.display_name, s.order_index, m.id as module_id
+          FROM sections s 
+          JOIN modules m ON s.module_id = m.id 
+          WHERE m.display_name = 'Security Awareness Essentials' 
+          AND s.display_name = 'Phishing and Social Engineering'
+        `, [], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+    }
 
     if (!section) {
       console.error('❌ Section not found!');
