@@ -177,6 +177,22 @@ app.use('/phishing-examples', express.static(phishingExamplesPath, {
   setHeaders: (res, filePath) => {
     // Set long cache for images
     res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    // Ensure CORS headers are set for images (important for cross-origin requests)
+    const origin = res.req.headers.origin;
+    if (origin) {
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (typeof allowed === 'string') {
+          return origin === allowed;
+        } else if (allowed instanceof RegExp) {
+          return allowed.test(origin);
+        }
+        return false;
+      });
+      if (isAllowed) {
+        res.set('Access-Control-Allow-Origin', origin);
+        res.set('Access-Control-Allow-Credentials', 'true');
+      }
+    }
   }
 }));
 
@@ -295,6 +311,31 @@ async function startServer() {
         }
       } catch (err) {
         console.warn('⚠️  Error ensuring phishing examples page:', err.message);
+      }
+      
+      // Check that images are available (non-blocking, non-fatal)
+      console.log('Checking phishing example images availability...');
+      try {
+        const checkImagesPath = path.join(__dirname, 'scripts', 'ensure-phishing-images-safe');
+        const checkImagesFullPath = checkImagesPath + '.js';
+        
+        if (fs.existsSync(checkImagesFullPath)) {
+          const checkImages = require(checkImagesPath);
+          // Run asynchronously - don't block server startup
+          checkImages()
+            .then(result => {
+              if (result && result.allFound) {
+                console.log('✅ All phishing example images are available');
+              } else {
+                console.warn('⚠️  Some phishing example images may be missing (non-fatal)');
+              }
+            })
+            .catch(err => {
+              console.warn('⚠️  Error checking images (non-fatal):', err.message);
+            });
+        }
+      } catch (err) {
+        console.warn('⚠️  Could not check images (non-fatal):', err.message);
       }
     }
     
