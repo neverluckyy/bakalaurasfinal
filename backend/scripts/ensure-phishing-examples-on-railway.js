@@ -32,7 +32,7 @@ async function ensurePhishingExamples() {
 
     if (!section) {
       console.error('❌ Section not found!');
-      process.exit(1);
+      throw new Error('Section "Phishing and Social Engineering" not found in Module 1');
     }
 
     console.log(`✓ Found section: ${section.display_name} (ID: ${section.id})`);
@@ -67,7 +67,7 @@ async function ensurePhishingExamples() {
       } else {
         console.log('  ✓ Page has images - all good!');
         console.log('\n✅ Nothing to do - page exists with images');
-        process.exit(0);
+        return { success: true, action: 'exists' };
       }
     } else {
       console.log('❌ "Real-World Examples" page NOT FOUND - will create it');
