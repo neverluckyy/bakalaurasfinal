@@ -22,9 +22,9 @@ const getImageUrl = (imagePath) => {
     return imagePath;
   }
   
-  // In production (Netlify), use relative path first
-  // Netlify proxy will forward /phishing-examples/* to Railway backend
-  // This avoids CORS issues since it's same-origin from browser perspective
+  // In production, try relative path first (Netlify proxy)
+  // If that fails, onError handler will try direct backend URL
+  // This ensures images work whether proxy works or not
   if (process.env.NODE_ENV === 'production') {
     return imagePath; // Use relative path - Netlify proxy handles it
   }
@@ -403,14 +403,14 @@ const SectionLearn = () => {
                             return;
                           }
                           
-                          // In production, if relative path failed, try direct backend URL as fallback
-                          if (process.env.NODE_ENV === 'production' && imageUrl === imagePath) {
-                            const backendUrl = getBackendImageUrl(imagePath);
-                            console.log('🔄 Netlify proxy failed, trying direct backend URL:', backendUrl);
+                          // Always try backend URL as fallback if relative path failed
+                          const backendUrl = getBackendImageUrl(imagePath);
+                          if (backendUrl !== imageUrl) {
+                            console.log('🔄 Relative path failed, trying direct backend URL:', backendUrl);
                             e.target.dataset.fallbackAttempted = 'true';
                             e.target.src = backendUrl;
                           } else {
-                            console.error('❌ No fallback available.');
+                            console.error('❌ No fallback available (both URLs are the same).');
                             e.target.style.display = 'none';
                             e.target.parentElement.innerHTML = `<div style="padding: 20px; text-align: center; color: #8A8A9A;">Image not available: ${altText || 'Phishing example'}<br/><small>Check browser console for details</small></div>`;
                           }
