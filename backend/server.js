@@ -183,8 +183,12 @@ async function startServer() {
           const ensurePhishingExamples = require(ensureScriptPath);
           // Run asynchronously so it doesn't block server startup
           ensurePhishingExamples()
-            .then(() => {
-              console.log('✅ Phishing examples page ensured on startup');
+            .then(result => {
+              if (result && result.success) {
+                console.log(`✅ Phishing examples page ${result.action} on startup`);
+              } else {
+                console.log('✅ Phishing examples page ensured on startup');
+              }
             })
             .catch(err => {
               console.error('⚠️  Failed to ensure phishing examples page (non-fatal):', err.message);
