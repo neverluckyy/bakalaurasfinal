@@ -22,21 +22,20 @@ const { initDatabase } = require('./database/init');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security middleware - configure Helmet to not interfere with CORS
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginEmbedderPolicy: false
-}));
-
 // Trust proxy for rate limiting
 app.set('trust proxy', 1);
 
-// CORS configuration
+// CORS configuration - MUST BE BEFORE HELMET AND ALL OTHER MIDDLEWARE
 // Explicitly allow both custom domain and Netlify subdomain
 let allowedOrigins = [];
 
 // Always include sensebait.pro domains regardless of environment
 const sensebaitOrigins = ['https://sensebait.pro', 'https://www.sensebait.pro'];
+
+// Detect production environment (Railway sets RAILWAY_ENVIRONMENT or PORT)
+const isProduction = process.env.NODE_ENV === 'production' || 
+                     process.env.RAILWAY_ENVIRONMENT || 
+                     (process.env.PORT && !process.env.NODE_ENV);
 
 if (process.env.ALLOWED_ORIGINS) {
   // If ALLOWED_ORIGINS is set, use it and also add sensebait.pro and Netlify pattern
@@ -49,8 +48,8 @@ if (process.env.ALLOWED_ORIGINS) {
   });
   // Always add Netlify pattern when ALLOWED_ORIGINS is set
   allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
-} else if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
-  // Default production origins (Railway sets RAILWAY_ENVIRONMENT)
+} else if (isProduction) {
+  // Default production origins
   allowedOrigins = [
     ...sensebaitOrigins,
     'https://beamish-granita-b7abb8.netlify.app' // Explicit Netlify subdomain
@@ -63,11 +62,16 @@ if (process.env.ALLOWED_ORIGINS) {
 }
 
 // Log allowed origins on startup for debugging
-console.log('CORS Allowed Origins:', allowedOrigins);
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('RAILWAY_ENVIRONMENT:', process.env.RAILWAY_ENVIRONMENT);
+console.log('='.repeat(80));
+console.log('CORS Configuration:');
+console.log('  Allowed Origins:', allowedOrigins);
+console.log('  NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('  RAILWAY_ENVIRONMENT:', process.env.RAILWAY_ENVIRONMENT || 'not set');
+console.log('  PORT:', process.env.PORT || 'not set');
+console.log('  Detected Production:', isProduction);
+console.log('='.repeat(80));
 
-// CORS middleware - must be before routes and rate limiting
+// CORS middleware - MUST BE FIRST (before Helmet and all other middleware)
 // Configure CORS to handle both preflight and actual requests
 app.use(cors({
   origin: (origin, callback) => {
@@ -87,12 +91,12 @@ app.use(cors({
     });
     
     if (isAllowed) {
-      console.log(`CORS allowed request from origin: ${origin}`);
+      console.log(`✅ CORS allowed request from origin: ${origin}`);
       callback(null, true);
     } else {
       // Log CORS rejection for debugging
-      console.log(`CORS blocked request from origin: ${origin}`);
-      console.log(`Allowed origins:`, allowedOrigins);
+      console.log(`❌ CORS blocked request from origin: ${origin}`);
+      console.log(`   Allowed origins:`, allowedOrigins);
       // Return false instead of error to let CORS send proper response
       callback(null, false);
     }
@@ -106,16 +110,29 @@ app.use(cors({
   maxAge: 86400 // Cache preflight for 24 hours
 }));
 
+// Security middleware - configure Helmet to not interfere with CORS
+// Must be AFTER CORS middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: false // Disable CSP to avoid conflicts with CORS
+}));
+
 // Rate limiting for auth routes (stricter for login/register)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 30 : 100, // Increased to prevent false positives
+  max: isProduction ? 30 : 100, // Increased to prevent false positives
   message: 'Too many authentication attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
     // Skip rate limiting for OPTIONS requests (preflight) and /me endpoint
-    return req.method === 'OPTIONS' || req.path === '/me';
+    const isOptions = req.method === 'OPTIONS';
+    const isMe = req.path === '/me' || req.path.endsWith('/me') || req.originalUrl.includes('/me');
+    if (isOptions) {
+      console.log('⏭️  Rate limiter skipping OPTIONS request');
+    }
+    return isOptions || isMe;
   }
 });
 
