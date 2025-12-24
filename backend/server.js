@@ -90,9 +90,18 @@ app.use(cookieParser());
 
 // Static files
 // CORS middleware is applied globally above, so these files will have proper CORS headers
-app.use('/avatars', express.static(path.join(__dirname, '../frontend/public/avatars')));
-app.use('/phishing-examples', express.static(path.join(__dirname, '../frontend/public/phishing-examples'), {
-  setHeaders: (res, path) => {
+// Try backend/public first (Railway), fallback to frontend/public (local dev)
+const phishingExamplesPath = fs.existsSync(path.join(__dirname, 'public/phishing-examples'))
+  ? path.join(__dirname, 'public/phishing-examples')
+  : path.join(__dirname, '../frontend/public/phishing-examples');
+
+const avatarsPath = fs.existsSync(path.join(__dirname, 'public/avatars'))
+  ? path.join(__dirname, 'public/avatars')
+  : path.join(__dirname, '../frontend/public/avatars');
+
+app.use('/avatars', express.static(avatarsPath));
+app.use('/phishing-examples', express.static(phishingExamplesPath, {
+  setHeaders: (res, filePath) => {
     // Set long cache for images
     res.set('Cache-Control', 'public, max-age=31536000, immutable');
   }
