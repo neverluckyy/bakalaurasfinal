@@ -243,12 +243,23 @@ app.use('*', (req, res) => {
 // Initialize database and start server
 async function startServer() {
   try {
-    console.log('Starting server initialization...');
+    console.log('='.repeat(80));
+    console.log('🚀 STARTING SERVER INITIALIZATION');
+    console.log('='.repeat(80));
+    console.log('Environment variables:');
+    console.log('  PORT:', process.env.PORT || 'not set (using default 5000)');
+    console.log('  NODE_ENV:', process.env.NODE_ENV || 'not set');
+    console.log('  RAILWAY_ENVIRONMENT:', process.env.RAILWAY_ENVIRONMENT || 'not set');
+    console.log('  Current working directory:', process.cwd());
+    console.log('  __dirname:', __dirname);
+    console.log('='.repeat(80));
+    
     console.log('Loading routes...');
     
     try {
+      console.log('Initializing database...');
       await initDatabase();
-      console.log('Database initialized successfully');
+      console.log('✅ Database initialized successfully');
     } catch (dbError) {
       console.error('❌ CRITICAL: Database initialization failed:', dbError);
       console.error('Stack:', dbError.stack);
@@ -331,9 +342,19 @@ async function startServer() {
     }
     
     // Railway requires binding to 0.0.0.0 to accept connections from the proxy
-    const HOST = process.env.RAILWAY_ENVIRONMENT ? '0.0.0.0' : 'localhost';
+    // Always use 0.0.0.0 in production (Railway or any cloud platform)
+    const HOST = (process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV === 'production') ? '0.0.0.0' : 'localhost';
     
-    app.listen(PORT, HOST, () => {
+    console.log('='.repeat(80));
+    console.log('🌐 STARTING HTTP SERVER');
+    console.log('='.repeat(80));
+    console.log(`Binding to: ${HOST}:${PORT}`);
+    console.log('Waiting for server to start...');
+    
+    const server = app.listen(PORT, HOST, () => {
+      console.log('='.repeat(80));
+      console.log('✅ SERVER IS NOW RUNNING AND ACCEPTING CONNECTIONS');
+      console.log('='.repeat(80));
       console.log(`✅ Server running on ${HOST}:${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
       console.log('CORS Allowed Origins:', allowedOrigins);
@@ -345,6 +366,9 @@ async function startServer() {
       console.log('  - /api/user/*');
       console.log('  - /api/sections/*');
       console.log('  - /api/support/*');
+      console.log('='.repeat(80));
+      console.log('✅ Server is ready to accept requests!');
+      console.log('='.repeat(80));
     }).on('error', (err) => {
       console.error('❌ CRITICAL: Failed to start server on port', PORT);
       console.error('Error:', err.message);
