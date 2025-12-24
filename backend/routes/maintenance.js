@@ -326,4 +326,40 @@ Remember: If an email seems suspicious, it probably is. When in doubt, don't cli
   }
 });
 
+/**
+ * Endpoint to add phishing examples page before the final page
+ * This will insert the page right before the last page in Module 1 Section 1
+ */
+router.post('/add-phishing-examples-page', async (req, res) => {
+  try {
+    console.log('='.repeat(80));
+    console.log('Maintenance endpoint: Adding phishing examples page before final page...');
+    console.log('='.repeat(80));
+    
+    const addPhishingExamplesPage = require('../scripts/add-phishing-examples-page');
+    
+    // Run the script
+    await addPhishingExamplesPage();
+    
+    console.log('✅ Phishing examples page added successfully');
+    console.log('='.repeat(80));
+
+    res.json({ 
+      success: true, 
+      message: 'Phishing examples page added before the final page',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Failed to add phishing examples page:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to add phishing examples page',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 module.exports = router;

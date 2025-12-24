@@ -3,7 +3,7 @@ const { initDatabase, getDatabase } = require('../database/init');
 /**
  * Script to add a new "Phishing Examples" page with images and explanations
  * to Module 1, Section 1 (Phishing and Social Engineering)
- * This will be added as a new page at the end of the existing content
+ * This will be inserted before the final page (after learning content, before final page)
  */
 
 async function addPhishingExamplesPage() {
@@ -47,7 +47,7 @@ async function addPhishingExamplesPage() {
     // Check existing content to find the highest order_index
     const existingContent = await new Promise((resolve, reject) => {
       db.all(
-        'SELECT screen_title, order_index FROM learning_content WHERE section_id = ? ORDER BY order_index',
+        'SELECT id, screen_title, order_index FROM learning_content WHERE section_id = ? ORDER BY order_index',
         [section.id],
         (err, rows) => {
           if (err) reject(err);
@@ -62,10 +62,14 @@ async function addPhishingExamplesPage() {
     });
     console.log('');
 
-    // Find the highest order_index
-    const maxOrderIndex = existingContent.length > 0 
-      ? Math.max(...existingContent.map(item => item.order_index))
-      : 0;
+    if (existingContent.length === 0) {
+      console.error('❌ No existing content found! Cannot determine where to insert.');
+      process.exit(1);
+    }
+
+    // Find the highest order_index (the final page)
+    const maxOrderIndex = Math.max(...existingContent.map(item => item.order_index));
+    const finalPage = existingContent.find(item => item.order_index === maxOrderIndex);
     
     // Check if "Phishing Examples" already exists
     const existingPhishingExamples = existingContent.find(
@@ -77,9 +81,10 @@ async function addPhishingExamplesPage() {
       console.log('  Will update it with new content...');
     }
 
-    // Determine the order_index for the new content (add after the last item)
-    const targetOrderIndex = maxOrderIndex + 1;
-    console.log(`✓ Will ${existingPhishingExamples ? 'update' : 'add'} at order_index ${targetOrderIndex}`);
+    // Insert BEFORE the final page: use the final page's order_index, then shift final page forward
+    const targetOrderIndex = maxOrderIndex;
+    console.log(`✓ Will ${existingPhishingExamples ? 'update' : 'insert'} at order_index ${targetOrderIndex}`);
+    console.log(`  Final page "${finalPage.screen_title}" will be shifted to order_index ${maxOrderIndex + 1}`);
     console.log('');
 
     // Create the Phishing Examples content with images and detailed explanations
@@ -219,7 +224,32 @@ Remember: If an email seems suspicious, it probably is. When in doubt, don't cli
       });
     }
 
-    // Insert the new content
+    // First, shift the final page forward to make room (only if it's not the phishing examples page)
+    if (finalPage && 
+        finalPage.screen_title !== 'Phishing Examples' && 
+        finalPage.screen_title !== 'Real-World Phishing Examples' &&
+        !existingPhishingExamples) {
+      await new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE learning_content SET order_index = ? WHERE id = ?',
+          [maxOrderIndex + 1, finalPage.id],
+          function(err) {
+            if (err) {
+              console.error('Error shifting final page:', err);
+              reject(err);
+            } else {
+              console.log(`✓ Shifted final page "${finalPage.screen_title}" to order_index ${maxOrderIndex + 1}`);
+              resolve();
+            }
+          }
+        );
+      });
+    } else if (existingPhishingExamples && existingPhishingExamples.id === finalPage.id) {
+      // If phishing examples is already the final page, we'll just update it in place
+      console.log('✓ Phishing examples is already the final page, will update in place');
+    }
+
+    // Now insert the phishing examples at the target order_index
     await new Promise((resolve, reject) => {
       db.run(
         'INSERT INTO learning_content (section_id, screen_title, read_time_min, content_markdown, order_index) VALUES (?, ?, ?, ?, ?)',
@@ -264,13 +294,19 @@ Remember: If an email seems suspicious, it probably is. When in doubt, don't cli
   }
 }
 
-// Run the script
-addPhishingExamplesPage()
-  .then(() => {
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('Fatal error:', error);
-    process.exit(1);
-  });
+// Export the function so it can be called from other modules
+module.exports = addPhishingExamplesPage;
+
+// Run the script if executed directly
+if (require.main === module) {
+  addPhishingExamplesPage()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Fatal error:', error);
+      process.exit(1);
+    });
+}
+
 
