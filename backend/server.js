@@ -46,15 +46,22 @@ const isProduction = process.env.NODE_ENV === 'production' ||
 
 if (process.env.ALLOWED_ORIGINS) {
   // If ALLOWED_ORIGINS is set, use it and also add sensebait.pro and Netlify pattern
-  allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
-  // Always ensure sensebait.pro domains are included
-  sensebaitOrigins.forEach(origin => {
-    if (!allowedOrigins.includes(origin)) {
-      allowedOrigins.push(origin);
-    }
-  });
-  // Always add Netlify pattern when ALLOWED_ORIGINS is set
-  allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
+  try {
+    allowedOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
+    // Always ensure sensebait.pro domains are included
+    sensebaitOrigins.forEach(origin => {
+      if (!allowedOrigins.includes(origin)) {
+        allowedOrigins.push(origin);
+      }
+    });
+    // Always add Netlify pattern when ALLOWED_ORIGINS is set
+    allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
+  } catch (err) {
+    console.error('Error parsing ALLOWED_ORIGINS, using defaults:', err.message);
+    // Fall back to default production origins
+    allowedOrigins = [...sensebaitOrigins, 'https://beamish-granita-b7abb8.netlify.app'];
+    allowedOrigins.push(/^https:\/\/.*\.netlify\.app$/);
+  }
 } else if (isProduction) {
   // Default production origins
   allowedOrigins = [
@@ -233,8 +240,14 @@ async function startServer() {
     console.log('Starting server initialization...');
     console.log('Loading routes...');
     
-    await initDatabase();
-    console.log('Database initialized successfully');
+    try {
+      await initDatabase();
+      console.log('Database initialized successfully');
+    } catch (dbError) {
+      console.error('❌ CRITICAL: Database initialization failed:', dbError);
+      console.error('Stack:', dbError.stack);
+      throw dbError; // Re-throw to prevent server from starting with broken database
+    }
     
     // Ensure phishing examples page exists on startup (always run in production)
     // Use same production detection logic as CORS config
@@ -312,7 +325,7 @@ async function startServer() {
     }
     
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`✅ Server running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'not set'}`);
       console.log('CORS Allowed Origins:', allowedOrigins);
       console.log('Routes registered:');
@@ -323,9 +336,18 @@ async function startServer() {
       console.log('  - /api/user/*');
       console.log('  - /api/sections/*');
       console.log('  - /api/support/*');
+    }).on('error', (err) => {
+      console.error('❌ CRITICAL: Failed to start server on port', PORT);
+      console.error('Error:', err.message);
+      console.error('Stack:', err.stack);
+      if (err.code === 'EADDRINUSE') {
+        console.error('Port', PORT, 'is already in use. Please check if another instance is running.');
+      }
+      process.exit(1);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('❌ CRITICAL: Failed to start server:', error);
+    console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
     process.exit(1);
   }
