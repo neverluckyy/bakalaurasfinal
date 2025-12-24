@@ -314,32 +314,47 @@ async function startServer() {
     // Ensure phishing examples page exists on startup (always run in production)
     // Use same production detection logic as CORS config
     if (isProduction) {
-      console.log('Ensuring phishing examples page exists...');
+      console.log('='.repeat(80));
+      console.log('ENSURING PHISHING EXAMPLES PAGE ON STARTUP');
+      console.log('='.repeat(80));
+      
+      // Run this synchronously to ensure it completes before server accepts requests
+      // But wrap in try-catch so it doesn't crash the server
       try {
         const ensureScriptPath = path.join(__dirname, 'scripts', 'ensure-phishing-examples-on-railway');
         const ensureFullPath = ensureScriptPath + '.js';
         
         if (fs.existsSync(ensureFullPath)) {
-          // Import the function from the script
+          console.log('✅ Found ensure-phishing-examples script');
+          // Import and run synchronously using await
           const ensurePhishingExamples = require(ensureScriptPath);
-          // Run asynchronously so it doesn't block server startup
-          ensurePhishingExamples()
+          
+          // Wait for it to complete (but with timeout to not block forever)
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout after 30 seconds')), 30000)
+          );
+          
+          Promise.race([
+            ensurePhishingExamples(),
+            timeoutPromise
+          ])
             .then(result => {
               if (result && result.success) {
-                console.log(`✅ Phishing examples page ${result.action} on startup`);
+                console.log(`✅ Phishing examples page ${result.action || 'processed'} on startup`);
               } else {
                 console.log('✅ Phishing examples page ensured on startup');
               }
             })
             .catch(err => {
               console.error('⚠️  Failed to ensure phishing examples page (non-fatal):', err.message);
-              // Don't crash the server if this fails
+              console.error('   This will not prevent the server from starting');
             });
         } else {
-          console.warn('⚠️  Ensure phishing examples script not found');
+          console.warn('⚠️  Ensure phishing examples script not found at:', ensureFullPath);
         }
       } catch (err) {
         console.warn('⚠️  Error ensuring phishing examples page:', err.message);
+        console.warn('   This will not prevent the server from starting');
       }
       
       // Check that images are available (non-blocking, non-fatal)
@@ -357,6 +372,9 @@ async function startServer() {
                 console.log('✅ All phishing example images are available');
               } else {
                 console.warn('⚠️  Some phishing example images may be missing (non-fatal)');
+                if (result && result.missing) {
+                  console.warn('   Missing:', result.missing.map(m => m.name).join(', '));
+                }
               }
             })
             .catch(err => {
@@ -366,6 +384,8 @@ async function startServer() {
       } catch (err) {
         console.warn('⚠️  Could not check images (non-fatal):', err.message);
       }
+      
+      console.log('='.repeat(80));
     }
     
     // Optional: Auto-update learning content on startup

@@ -175,8 +175,46 @@ This phishing attempt uses the name "ShareFile" (a legitimate file-sharing servi
 
 Remember: If an email seems suspicious, it probably is. When in doubt, don't click, and verify through a trusted channel.`;
 
-    // Determine order_index (use 3 if page doesn't exist, or keep existing)
-    const orderIndex = existingPage ? existingPage.order_index : 3;
+    // Determine order_index
+    // Get the max order_index for this section to place it at the end (before final page if exists)
+    const maxOrderResult = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT MAX(order_index) as max_order FROM learning_content WHERE section_id = ?',
+        [section.id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+    
+    // If page exists, keep its order_index, otherwise place it before the last page
+    // If max_order is 3 or less, use max_order + 1, otherwise use max_order (insert before last)
+    let orderIndex;
+    if (existingPage) {
+      orderIndex = existingPage.order_index;
+    } else {
+      const maxOrder = maxOrderResult.max_order || 0;
+      // Place it as the second-to-last page (before the final page)
+      // If there are pages, use max_order, otherwise use 3
+      orderIndex = maxOrder > 0 ? maxOrder : 3;
+      
+      // If we're inserting before the last page, we need to shift the last page
+      if (maxOrder > 0) {
+        // Shift the last page's order_index by 1
+        await new Promise((resolve, reject) => {
+          db.run(
+            'UPDATE learning_content SET order_index = order_index + 1 WHERE section_id = ? AND order_index = ?',
+            [section.id, maxOrder],
+            function(err) {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+        console.log(`✓ Shifted last page (order_index ${maxOrder}) to ${maxOrder + 1}`);
+      }
+    }
 
     if (existingPage) {
       // Update existing page
