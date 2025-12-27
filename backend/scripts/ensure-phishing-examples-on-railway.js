@@ -70,23 +70,7 @@ async function ensurePhishingExamples() {
 
     if (existingPage) {
       console.log(`✓ "Real-World Examples" page exists (order_index: ${existingPage.order_index})`);
-      
-      // Check if it has images
-      const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-      const images = [];
-      let match;
-      while ((match = imageRegex.exec(existingPage.content_markdown)) !== null) {
-        images.push({ alt: match[1], path: match[2] });
-      }
-      
-      console.log(`  Images found: ${images.length}`);
-      if (images.length === 0) {
-        console.log('  ⚠️ Page exists but has NO images - will update it');
-      } else {
-        console.log('  ✓ Page has images - all good!');
-        console.log('\n✅ Nothing to do - page exists with images');
-        return { success: true, action: 'exists' };
-      }
+      console.log('  Will update content to ensure latest version with improved descriptions');
     } else {
       console.log('❌ "Real-World Examples" page NOT FOUND - will create it');
     }
