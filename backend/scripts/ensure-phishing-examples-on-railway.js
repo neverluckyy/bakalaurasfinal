@@ -108,7 +108,8 @@ This attack attempts to steal your email or security credentials by tricking you
 - **Trust exploitation**: Uses security-related language to make the request seem necessary
 
 ![BGS Security email showing quarantine message](/phishing-examples/bgs-security-email.png)
-*The phishing email: "You Have Messages In Quarantine"*
+
+The phishing email: "You Have Messages In Quarantine"
 
 **Red flags to look out for:**
 - **Urgent language**: "You Have Messages" creates artificial urgency to bypass your critical thinking
@@ -118,7 +119,8 @@ This attack attempts to steal your email or security credentials by tricking you
 - **Unfamiliar service**: You may not recognize "BGS Security" or remember signing up for their service
 
 ![Fake BGS Security login page](/phishing-examples/bgs-security-website.png)
-*The fake login page that appears after clicking the link*
+
+The fake login page that appears after clicking the link
 
 **What happens if you click:**
 - You're taken to a fake login page (enogp3wehr.pages.dev in this example - clearly not a legitimate security service domain)
@@ -141,7 +143,8 @@ This attack aims to steal your Microsoft Office 365 or Microsoft account credent
 - **Professional appearance**: Mimics Microsoft's email design to look authentic
 
 ![Office 365 phishing email about password update](/phishing-examples/office365-email.png)
-*The phishing email: "Operations Authentication / Office365 password update"*
+
+The phishing email: "Operations Authentication / Office365 password update"
 
 **Red flags to look out for:**
 - **Suspicious sender domain**: The "from" address may not be from @microsoft.com or @office365.com
@@ -152,7 +155,8 @@ This attack aims to steal your Microsoft Office 365 or Microsoft account credent
 - **No account-specific details**: Legitimate Microsoft emails usually reference your account name or email address
 
 ![Fake Microsoft login page](/phishing-examples/office365-website.png)
-*The spoofed Microsoft login page (plast.toys.up-plastic.com)*
+
+The spoofed Microsoft login page (plast.toys.up-plastic.com)
 
 **What happens if you click:**
 - You're directed to a fake Microsoft login page that looks nearly identical to the real one
@@ -175,7 +179,8 @@ This attack attempts to steal your credentials by impersonating ShareFile (a leg
 - **Curiosity exploitation**: Makes you want to see what the "encrypted message" contains
 
 ![ShareFile phishing email about encrypted message](/phishing-examples/sharefile-email.png)
-*The phishing email: "Encrypted message / ACH transfer awaiting your review"*
+
+The phishing email: "Encrypted message / ACH transfer awaiting your review"
 
 **Red flags to look out for:**
 - **Vague business context**: Mentions "ACH transfer" but lacks specific details (amount, sender, transaction ID, account numbers)
@@ -186,7 +191,8 @@ This attack attempts to steal your credentials by impersonating ShareFile (a leg
 - **No prior context**: Legitimate business communications usually reference previous conversations or transactions
 
 ![Fake ShareFile login page](/phishing-examples/sharefile-website.png)
-*The fake "Webmail Portal Access" login page (r2.dev)*
+
+The fake "Webmail Portal Access" login page (r2.dev)
 
 **What happens if you click:**
 - You're taken to a fake login portal (r2.dev in this example - not sharefile.com)
