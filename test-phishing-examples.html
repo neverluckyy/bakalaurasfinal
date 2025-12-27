@@ -86,6 +86,13 @@
     </div>
 
     <div class="test-section">
+        <h2>4b. Force Update Phishing Examples Page</h2>
+        <p><strong>This will DELETE and RECREATE the page with latest content (removes asterisks, etc.)</strong></p>
+        <button onclick="forceUpdatePhishingExamples()" style="background: #f44336;">Force Update (Delete & Recreate)</button>
+        <div id="force-update-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
         <h2>5. Test Image Loading</h2>
         <p>Test if images can be loaded from the server</p>
         <button onclick="testImageLoading()">Test Images</button>
@@ -195,6 +202,39 @@
                     resultDiv.className = 'result success';
                     resultDiv.textContent += '\n\n✅ Page created/updated successfully!';
                     resultDiv.textContent += '\n\nRefresh the learning content page to see it.';
+                } else {
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}\n\n${error.stack || ''}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function forceUpdatePhishingExamples() {
+            const resultDiv = document.getElementById('force-update-result');
+            if (!confirm('This will DELETE the existing "Real-World Examples" page and recreate it with the latest content (no asterisks). Continue?')) {
+                return;
+            }
+            
+            resultDiv.textContent = 'Force updating page... Deleting old version and creating new one...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/maintenance/force-update-phishing-examples`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent += '\n\n✅ Page force updated successfully!';
+                    resultDiv.textContent += '\n\nRefresh the learning content page to see the updated content (no asterisks).';
                 } else {
                     resultDiv.className = 'result error';
                 }
