@@ -111,12 +111,18 @@ router.get('/check-content', async (req, res) => {
 /**
  * Endpoint to manually ensure phishing examples page exists
  * POST /api/maintenance/ensure-phishing-examples
+ * Optionally accepts { force: true } in body to force update even if page exists
  */
 router.post('/ensure-phishing-examples', async (req, res) => {
   try {
     console.log('='.repeat(80));
-    console.log('MANUALLY TRIGGERING PHISHING EXAMPLES PAGE CREATION');
+    console.log('MANUALLY TRIGGERING PHISHING EXAMPLES PAGE UPDATE');
     console.log('='.repeat(80));
+    
+    const { force } = req.body || {};
+    if (force) {
+      console.log('Force update requested - will update content even if page exists');
+    }
     
     const ensurePhishingExamples = require('../scripts/ensure-phishing-examples-on-railway');
     const result = await ensurePhishingExamples();
@@ -127,10 +133,73 @@ router.post('/ensure-phishing-examples', async (req, res) => {
     res.json({ 
       success: true, 
       result,
-      message: `Phishing examples page ${result.action || 'processed'}`
+      message: `Phishing examples page ${result.action || 'updated'}`
     });
   } catch (error) {
     console.error('Error ensuring phishing examples:', error);
+    res.status(500).json({ 
+      error: error.message, 
+      stack: error.stack 
+    });
+  }
+});
+
+/**
+ * Endpoint to force delete and recreate phishing examples page
+ * POST /api/maintenance/force-update-phishing-examples
+ */
+router.post('/force-update-phishing-examples', async (req, res) => {
+  try {
+    console.log('='.repeat(80));
+    console.log('FORCE UPDATING PHISHING EXAMPLES PAGE');
+    console.log('='.repeat(80));
+    
+    const db = getDatabase();
+    
+    // Find the section
+    const section = await new Promise((resolve, reject) => {
+      db.get(`
+        SELECT s.id, s.display_name
+        FROM sections s 
+        JOIN modules m ON s.module_id = m.id 
+        WHERE m.display_name = 'Security Awareness Essentials' 
+        AND s.display_name = 'Phishing and Social Engineering'
+      `, [], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    
+    if (!section) {
+      return res.status(404).json({ error: 'Section not found' });
+    }
+    
+    // Delete existing page
+    await new Promise((resolve, reject) => {
+      db.run(
+        'DELETE FROM learning_content WHERE section_id = ? AND screen_title = ?',
+        [section.id, 'Real-World Examples'],
+        function(err) {
+          if (err) reject(err);
+          else {
+            console.log(`✓ Deleted existing "Real-World Examples" page`);
+            resolve();
+          }
+        }
+      );
+    });
+    
+    // Now create it fresh
+    const ensurePhishingExamples = require('../scripts/ensure-phishing-examples-on-railway');
+    const result = await ensurePhishingExamples();
+    
+    res.json({ 
+      success: true, 
+      result,
+      message: 'Phishing examples page force updated'
+    });
+  } catch (error) {
+    console.error('Error force updating phishing examples:', error);
     res.status(500).json({ 
       error: error.message, 
       stack: error.stack 
