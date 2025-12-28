@@ -212,7 +212,26 @@ router.get('/', authenticateToken, async (req, res) => {
       };
     }));
 
-    res.json(modulesWithProgress);
+    // Apply sequential locking: first module is always available, others require previous module to be 100% complete
+    const modulesWithLocking = modulesWithProgress.map((module, index) => {
+      let isAvailable = false;
+      
+      if (index === 0) {
+        // First module is always available
+        isAvailable = true;
+      } else {
+        // Module is available if previous module is 100% complete
+        const previousModule = modulesWithProgress[index - 1];
+        isAvailable = previousModule.completion_percentage === 100;
+      }
+      
+      return {
+        ...module,
+        available: isAvailable
+      };
+    });
+
+    res.json(modulesWithLocking);
   } catch (error) {
     console.error('Database error:', error);
     res.status(500).json({ error: 'Database error' });
@@ -364,6 +383,63 @@ router.get('/:moduleId', authenticateToken, async (req, res) => {
       }
     }
 
+    // Check if module is available (first module is always available, others require previous module to be 100% complete)
+    let isAvailable = false;
+    if (module.order_index === 1) {
+      // First module is always available
+      isAvailable = true;
+    } else {
+      // Get previous module to check if it's 100% complete
+      const previousModule = await new Promise((resolve, reject) => {
+        db.get(
+          `SELECT 
+            m.id,
+            COUNT(DISTINCT s.id) as section_count
+          FROM modules m
+          LEFT JOIN sections s ON m.id = s.module_id
+          WHERE m.order_index = ?
+          GROUP BY m.id`,
+          [module.order_index - 1],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      if (previousModule) {
+        // Get completed sections for previous module
+        const previousSections = await new Promise((resolve, reject) => {
+          db.all(
+            `SELECT id FROM sections WHERE module_id = ? ORDER BY order_index`,
+            [previousModule.id],
+            (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows || []);
+            }
+          );
+        });
+
+        let previousCompletedSections = 0;
+        for (const section of previousSections) {
+          try {
+            const isCompleted = await checkSectionCompletion(db, userId, section.id);
+            if (isCompleted) {
+              previousCompletedSections++;
+            }
+          } catch (err) {
+            console.error(`Error checking previous module section ${section.id} completion:`, err);
+          }
+        }
+
+        const previousCompletionPercentage = previousModule.section_count > 0
+          ? Math.round((previousCompletedSections / previousModule.section_count) * 100)
+          : 0;
+        
+        isAvailable = previousCompletionPercentage === 100;
+      }
+    }
+
     // Calculate completion percentage
     const moduleWithProgress = {
       ...module,
@@ -371,7 +447,8 @@ router.get('/:moduleId', authenticateToken, async (req, res) => {
       completion_percentage: module.section_count > 0
         ? Math.round((completedSections / module.section_count) * 100)
         : 0,
-      has_started: hasStarted
+      has_started: hasStarted,
+      available: isAvailable
     };
 
     res.json(moduleWithProgress);

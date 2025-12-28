@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, CheckCircle, Shield, ShieldAlert, MailWarning } from 'lucide-react';
+import { BookOpen, CheckCircle, Shield, ShieldAlert, MailWarning, Lock } from 'lucide-react';
 import axios from 'axios';
 import './Modules.css';
 
@@ -57,56 +57,71 @@ function Modules() {
       </div>
 
       <div className="modules-grid">
-        {Array.isArray(modules) && modules.map((module, index) => (
-          <div key={module.id} className="module-card">
-            <div className="module-content">
-              <h3>{module.display_name}</h3>
-              <p className="module-description">
-                {module.description || 'Learn essential security concepts and best practices'}
-              </p>
-              
-              <div className="module-stats">
-                <div className="stat">
-                  <BookOpen className="stat-icon" />
-                  <span>{module.section_count} sections</span>
+        {Array.isArray(modules) && modules.map((module, index) => {
+          const isAvailable = module.available !== false; // Default to true if not specified (backward compatibility)
+          const isLocked = !isAvailable;
+          
+          return (
+            <div 
+              key={module.id} 
+              className={`module-card ${isLocked ? 'locked' : ''}`}
+            >
+              <div className="module-content">
+                <h3>{module.display_name}</h3>
+                <p className="module-description">
+                  {module.description || 'Learn essential security concepts and best practices'}
+                </p>
+                
+                <div className="module-stats">
+                  <div className="stat">
+                    <BookOpen className="stat-icon" />
+                    <span>{module.section_count} sections</span>
+                  </div>
+                  <div className="stat">
+                    <CheckCircle className="stat-icon" />
+                    <span>{module.completed_sections} completed</span>
+                  </div>
                 </div>
-                <div className="stat">
-                  <CheckCircle className="stat-icon" />
-                  <span>{module.completed_sections} completed</span>
-                </div>
-              </div>
-              
-              <div className="module-progress">
-                <div 
-                  className="progress-bar"
-                  role="progressbar" 
-                  aria-valuenow={module.completion_percentage} 
-                  aria-valuemin="0" 
-                  aria-valuemax="100"
-                  aria-label={`${module.display_name} progress: ${module.completion_percentage}% complete`}
-                >
+                
+                <div className="module-progress">
                   <div 
-                    className="progress-fill" 
-                    style={{ width: `${module.completion_percentage}%` }}
-                  ></div>
-                  <span className="progress-text">{module.completion_percentage}%</span>
+                    className="progress-bar"
+                    role="progressbar" 
+                    aria-valuenow={module.completion_percentage} 
+                    aria-valuemin="0" 
+                    aria-valuemax="100"
+                    aria-label={`${module.display_name} progress: ${module.completion_percentage}% complete`}
+                  >
+                    <div 
+                      className="progress-fill" 
+                      style={{ width: `${module.completion_percentage}%` }}
+                    ></div>
+                    <span className="progress-text">{module.completion_percentage}%</span>
+                  </div>
                 </div>
+                
+                {isLocked ? (
+                  <div className="module-locked">
+                    <Lock className="lock-icon" />
+                    <span className="locked-message">Complete previous module to unlock</span>
+                  </div>
+                ) : (
+                  <Link 
+                    to={`/modules/${module.id}`} 
+                    className="btn btn-primary module-btn"
+                  >
+                    {getModuleButtonIcon(module.display_name)}
+                    {module.completion_percentage === 100 
+                      ? 'Review' 
+                      : module.has_started 
+                        ? 'Continue Learning' 
+                        : 'Start Learning'}
+                  </Link>
+                )}
               </div>
-              
-              <Link 
-                to={`/modules/${module.id}`} 
-                className="btn btn-primary module-btn"
-              >
-                {getModuleButtonIcon(module.display_name)}
-                {module.completion_percentage === 100 
-                  ? 'Review' 
-                  : module.has_started 
-                    ? 'Continue Learning' 
-                    : 'Start Learning'}
-              </Link>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {(!Array.isArray(modules) || modules.length === 0) && (

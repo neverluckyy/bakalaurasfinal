@@ -150,6 +150,9 @@ const ModuleDetail = () => {
     );
   }
 
+  // Check if module is locked (not available)
+  const isModuleLocked = module.available === false;
+
   const getSectionIcon = (section) => {
     if (section.completed) return <ShieldCheck className="section-icon completed" />;
     if (section.available) return <Shield className="section-icon available" />;
@@ -169,6 +172,24 @@ const ModuleDetail = () => {
 
   // Check if module has no questions
   const hasNoQuestions = totalQuestions === 0 && sections.length > 0;
+
+  // Show locked message if module is not available
+  if (isModuleLocked) {
+    return (
+      <div className="module-detail-container">
+        <div className="empty-state">
+          <Lock size={48} className="empty-icon" />
+          <h3>Module Locked</h3>
+          <p>This module is locked. Complete the previous module to unlock it.</p>
+          <div className="empty-state-actions">
+            <Link to="/modules" className="btn btn-primary">
+              Back to Modules
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="module-detail-container">
