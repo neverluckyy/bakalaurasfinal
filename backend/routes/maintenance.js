@@ -189,9 +189,52 @@ router.post('/force-update-phishing-examples', async (req, res) => {
       );
     });
     
-    // Now create it fresh
+    // Import and run the ensure function
     const ensurePhishingExamples = require('../scripts/ensure-phishing-examples-on-railway');
     const result = await ensurePhishingExamples();
+    
+    // Double-check: Query the database to verify no asterisks were inserted
+    // and clean them if they exist (safety net)
+    const verifyContent = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT id, content_markdown FROM learning_content WHERE section_id = ? AND screen_title = ?',
+        [section.id, 'Real-World Examples'],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+    
+    if (verifyContent && verifyContent.content_markdown) {
+      const hasAsterisks = verifyContent.content_markdown.includes('**');
+      if (hasAsterisks) {
+        console.error('⚠️  WARNING: Content still has asterisks after update!');
+        console.error('Removing asterisks manually...');
+        
+        // Remove all ** markers (but keep the text)
+        const cleanedContent = verifyContent.content_markdown
+          .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove **text** but keep text
+          .replace(/\*\*/g, ''); // Remove any remaining **
+        
+        // Update with cleaned content
+        await new Promise((resolve, reject) => {
+          db.run(
+            'UPDATE learning_content SET content_markdown = ? WHERE id = ?',
+            [cleanedContent, verifyContent.id],
+            function(err) {
+              if (err) reject(err);
+              else {
+                console.log('✓ Removed asterisks from database content');
+                resolve();
+              }
+            }
+          );
+        });
+      } else {
+        console.log('✅ Verified: Content has no asterisks');
+      }
+    }
     
     res.json({ 
       success: true, 
