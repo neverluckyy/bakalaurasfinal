@@ -208,6 +208,66 @@ router.post('/force-update-phishing-examples', async (req, res) => {
 });
 
 /**
+ * Get the actual content of the Real-World Examples page for debugging
+ * GET /api/maintenance/get-examples-content
+ */
+router.get('/get-examples-content', (req, res) => {
+  try {
+    const db = getDatabase();
+    
+    // Find the section
+    db.get(`
+      SELECT s.id, s.display_name
+      FROM sections s 
+      JOIN modules m ON s.module_id = m.id 
+      WHERE m.display_name = 'Security Awareness Essentials' 
+      AND s.display_name = 'Phishing and Social Engineering'
+    `, [], (err, section) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error', message: err.message });
+      }
+      
+      if (!section) {
+        return res.status(404).json({ error: 'Section not found' });
+      }
+      
+      // Get the Real-World Examples page content
+      db.get(
+        'SELECT id, screen_title, content_markdown FROM learning_content WHERE section_id = ? AND screen_title = ?',
+        [section.id, 'Real-World Examples'],
+        (err, page) => {
+          if (err) {
+            return res.status(500).json({ error: 'Database error', message: err.message });
+          }
+          
+          if (!page) {
+            return res.status(404).json({ error: 'Real-World Examples page not found' });
+          }
+          
+          // Check for asterisks
+          const hasAsterisks = page.content_markdown.includes('**');
+          const asteriskLines = page.content_markdown.split('\n')
+            .map((line, i) => ({ lineNum: i + 1, line, hasAsterisks: line.includes('**') }))
+            .filter(item => item.hasAsterisks);
+          
+          res.json({
+            id: page.id,
+            title: page.screen_title,
+            has_asterisks: hasAsterisks,
+            asterisk_line_count: asteriskLines.length,
+            asterisk_lines: asteriskLines.slice(0, 20), // First 20 lines with asterisks
+            content_preview: page.content_markdown.substring(0, 1000),
+            content_length: page.content_markdown.length
+          });
+        }
+      );
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Get all sections with their IDs for debugging
  */
 router.get('/sections', (req, res) => {
