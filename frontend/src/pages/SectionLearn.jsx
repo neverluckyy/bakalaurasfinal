@@ -325,37 +325,78 @@ const SectionLearn = () => {
               const lines = currentContent.content_markdown.split('\n');
               const elements = [];
 
-              // Helper function to parse markdown links in text
+              // Helper function to parse markdown links and inline bold text
               const parseMarkdownLinks = (text) => {
                 const parts = [];
                 let lastIndex = 0;
-                // Match markdown links: [text](url)
+                
+                // Find all markdown elements (links and bold) in order
+                const markdownElements = [];
+                
+                // Find all links: [text](url)
                 const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-                let match;
-
-                while ((match = linkRegex.exec(text)) !== null) {
-                  // Add text before the link
-                  if (match.index > lastIndex) {
-                    parts.push(text.substring(lastIndex, match.index));
-                  }
-                  // Add the link
-                  parts.push(
-                    <a 
-                      key={match.index}
-                      href={match[2]} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="citation-link"
-                    >
-                      {match[1]}
-                    </a>
-                  );
-                  lastIndex = match.index + match[0].length;
+                let linkMatch;
+                while ((linkMatch = linkRegex.exec(text)) !== null) {
+                  markdownElements.push({
+                    index: linkMatch.index,
+                    type: 'link',
+                    text: linkMatch[1],
+                    url: linkMatch[2],
+                    length: linkMatch[0].length
+                  });
                 }
+                
+                // Find all bold: **text**
+                const boldRegex = /\*\*([^*]+)\*\*/g;
+                let boldMatch;
+                while ((boldMatch = boldRegex.exec(text)) !== null) {
+                  markdownElements.push({
+                    index: boldMatch.index,
+                    type: 'bold',
+                    text: boldMatch[1],
+                    length: boldMatch[0].length
+                  });
+                }
+                
+                // Sort by position in text
+                markdownElements.sort((a, b) => a.index - b.index);
+                
+                // Process each element in order
+                markdownElements.forEach((element, i) => {
+                  // Add text before this element
+                  if (element.index > lastIndex) {
+                    parts.push(text.substring(lastIndex, element.index));
+                  }
+                  
+                  // Add the markdown element
+                  if (element.type === 'link') {
+                    parts.push(
+                      <a 
+                        key={`md-${i}`}
+                        href={element.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="citation-link"
+                      >
+                        {element.text}
+                      </a>
+                    );
+                  } else if (element.type === 'bold') {
+                    parts.push(
+                      <strong key={`md-${i}`}>
+                        {element.text}
+                      </strong>
+                    );
+                  }
+                  
+                  lastIndex = element.index + element.length;
+                });
+                
                 // Add remaining text
                 if (lastIndex < text.length) {
                   parts.push(text.substring(lastIndex));
                 }
+                
                 return parts.length > 0 ? parts : [text];
               };
 
