@@ -222,53 +222,72 @@ router.put('/sections/:id', (req, res) => {
 // Delete section
 router.delete('/sections/:id', (req, res) => {
   const db = getDatabase();
+  const sectionId = req.params.id;
   
-  // Check if section has questions or content
-  db.get(`
-    SELECT 
-      (SELECT COUNT(*) FROM questions WHERE section_id = ?) as question_count,
-      (SELECT COUNT(*) FROM learning_content WHERE section_id = ?) as content_count
-  `, [req.params.id, req.params.id], (err, result) => {
-    if (err) {
-      console.error('Database error checking section dependencies:', err);
-      return res.status(500).json({ error: 'Database error', details: err.message });
-    }
-    if (result.question_count > 0 || result.content_count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete section with existing questions or learning content',
-        question_count: result.question_count,
-        content_count: result.content_count
-      });
-    }
+  // Delete all related records first (cascading delete)
+  db.serialize(() => {
+    // Delete user progress for questions in this section
+    db.run(
+      `DELETE FROM user_progress 
+       WHERE question_id IN (SELECT id FROM questions WHERE section_id = ?)`,
+      [sectionId],
+      (err) => {
+        if (err) {
+          console.error('Error deleting user progress:', err);
+        }
+      }
+    );
     
-    // Delete related records first (section_reading_position and quiz_draft_state)
-    // These don't prevent deletion but should be cleaned up
-    db.serialize(() => {
-      // Delete section reading positions
-      db.run('DELETE FROM section_reading_position WHERE section_id = ?', [req.params.id], (err) => {
+    // Delete user learning progress for content in this section
+    db.run(
+      `DELETE FROM user_learning_progress 
+       WHERE learning_content_id IN (SELECT id FROM learning_content WHERE section_id = ?)`,
+      [sectionId],
+      (err) => {
         if (err) {
-          console.error('Error deleting section reading positions:', err);
+          console.error('Error deleting user learning progress:', err);
         }
-      });
-      
-      // Delete quiz draft states
-      db.run('DELETE FROM quiz_draft_state WHERE section_id = ?', [req.params.id], (err) => {
-        if (err) {
-          console.error('Error deleting quiz draft states:', err);
-        }
-      });
-      
-      // Now delete the section
-      db.run('DELETE FROM sections WHERE id = ?', [req.params.id], function(err) {
-        if (err) {
-          console.error('Database error deleting section:', err);
-          return res.status(500).json({ error: 'Database error', details: err.message });
-        }
-        if (this.changes === 0) {
-          return res.status(404).json({ error: 'Section not found' });
-        }
-        res.json({ message: 'Section deleted successfully' });
-      });
+      }
+    );
+    
+    // Delete questions (this will cascade to user_progress, but we already deleted it above)
+    db.run('DELETE FROM questions WHERE section_id = ?', [sectionId], (err) => {
+      if (err) {
+        console.error('Error deleting questions:', err);
+      }
+    });
+    
+    // Delete learning content
+    db.run('DELETE FROM learning_content WHERE section_id = ?', [sectionId], (err) => {
+      if (err) {
+        console.error('Error deleting learning content:', err);
+      }
+    });
+    
+    // Delete section reading positions
+    db.run('DELETE FROM section_reading_position WHERE section_id = ?', [sectionId], (err) => {
+      if (err) {
+        console.error('Error deleting section reading positions:', err);
+      }
+    });
+    
+    // Delete quiz draft states
+    db.run('DELETE FROM quiz_draft_state WHERE section_id = ?', [sectionId], (err) => {
+      if (err) {
+        console.error('Error deleting quiz draft states:', err);
+      }
+    });
+    
+    // Finally, delete the section itself
+    db.run('DELETE FROM sections WHERE id = ?', [sectionId], function(err) {
+      if (err) {
+        console.error('Database error deleting section:', err);
+        return res.status(500).json({ error: 'Database error', details: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Section not found' });
+      }
+      res.json({ message: 'Section deleted successfully along with all related data' });
     });
   });
 });
