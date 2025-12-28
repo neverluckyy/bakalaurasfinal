@@ -6,7 +6,8 @@ import {
   Trophy, 
   Star,
   X,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import axios from 'axios';
 import './Home.css';
@@ -319,36 +320,51 @@ function Home() {
       <div className="recent-progress">
         <h2>Your Progress</h2>
         <div className="modules-grid">
-          {Array.isArray(modules) && modules.slice(0, 3).map((module) => (
-            <div key={module.id} className="module-card">
-              <div className="module-header">
-                <h3>{module.display_name}</h3>
-                <span className="completion-badge">
-                  {module.completion_percentage}%
-                </span>
-              </div>
-              <div className="module-progress">
-                <div 
-                  className="progress-bar"
-                  role="progressbar" 
-                  aria-valuenow={module.completion_percentage} 
-                  aria-valuemin="0" 
-                  aria-valuemax="100"
-                  aria-label={`${module.display_name} progress: ${module.completion_percentage}% complete`}
-                >
-                  <div 
-                    className="progress-fill" 
-                    style={{ width: `${module.completion_percentage}%` }}
-                  ></div>
-                  <span className="progress-text">{module.completion_percentage}%</span>
+          {Array.isArray(modules) && modules.slice(0, 3).map((module) => {
+            const isAvailable = module.available !== false; // Default to true if not specified (backward compatibility)
+            const isLocked = !isAvailable;
+            
+            return (
+              <div 
+                key={module.id} 
+                className={`module-card ${isLocked ? 'locked' : ''}`}
+              >
+                <div className="module-header">
+                  <h3>{module.display_name}</h3>
+                  <span className="completion-badge">
+                    {module.completion_percentage}%
+                  </span>
                 </div>
-                <p>{module.completed_sections} of {module.section_count} sections completed</p>
+                <div className="module-progress">
+                  <div 
+                    className="progress-bar"
+                    role="progressbar" 
+                    aria-valuenow={module.completion_percentage} 
+                    aria-valuemin="0" 
+                    aria-valuemax="100"
+                    aria-label={`${module.display_name} progress: ${module.completion_percentage}% complete`}
+                  >
+                    <div 
+                      className="progress-fill" 
+                      style={{ width: `${module.completion_percentage}%` }}
+                    ></div>
+                    <span className="progress-text">{module.completion_percentage}%</span>
+                  </div>
+                  <p>{module.completed_sections} of {module.section_count} sections completed</p>
+                </div>
+                {isLocked ? (
+                  <div className="module-locked">
+                    <Lock className="lock-icon" />
+                    <span className="locked-message">Complete previous module to unlock</span>
+                  </div>
+                ) : (
+                  <Link to={`/modules/${module.id}`} className="btn btn-secondary">
+                    {module.has_started ? 'Continue Learning' : 'Start learning'}
+                  </Link>
+                )}
               </div>
-              <Link to={`/modules/${module.id}`} className="btn btn-secondary">
-                {module.has_started ? 'Continue Learning' : 'Start learning'}
-              </Link>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
