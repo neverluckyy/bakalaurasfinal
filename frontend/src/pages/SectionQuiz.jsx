@@ -19,6 +19,8 @@ const SectionQuiz = () => {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [score, setScore] = useState(0);
   const [xpEarned, setXpEarned] = useState(0);
+  const [bonusXP, setBonusXP] = useState(0);
+  const [isPerfectScore, setIsPerfectScore] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [moduleId, setModuleId] = useState(null);
@@ -363,9 +365,16 @@ const SectionQuiz = () => {
       // Quiz completed
       const finalScore = score; // Score is already updated in handleSubmitAnswer
       const percentage = (finalScore / questions.length) * 100;
-      const earnedXP = Math.round((percentage / 100) * 50); // Max 50 XP per quiz
+      let earnedXP = Math.round((percentage / 100) * 50); // Max 50 XP per quiz
+      
+      // Bonus XP for perfect score (100%)
+      const isPerfect = finalScore === questions.length;
+      const bonus = isPerfect ? 25 : 0; // 25 XP bonus for perfect score
+      earnedXP += bonus;
       
       setXpEarned(earnedXP);
+      setBonusXP(bonus);
+      setIsPerfectScore(isPerfect);
       setQuizCompleted(true);
 
       // Submit quiz results
@@ -394,8 +403,17 @@ const SectionQuiz = () => {
           console.error('Error clearing draft state from server:', draftErr);
         }
 
-        // Update user XP
+        // Update user XP - use backend's calculated value (includes bonus)
         if (response.data.xpEarned) {
+          // Update displayed XP with backend's value (which includes bonus)
+          setXpEarned(response.data.xpEarned);
+          if (response.data.bonusXP !== undefined) {
+            setBonusXP(response.data.bonusXP);
+          }
+          if (response.data.isPerfectScore !== undefined) {
+            setIsPerfectScore(response.data.isPerfectScore);
+          }
+          
           // Fetch updated user stats to ensure we have the latest data
           try {
             await axios.get('/api/user/stats');
@@ -433,6 +451,8 @@ const SectionQuiz = () => {
     setQuizCompleted(false);
     setScore(0);
     setXpEarned(0);
+    setBonusXP(0);
+    setIsPerfectScore(false);
     setShowExplanation(false);
     setAnswerSubmitted(false);
     
@@ -570,7 +590,13 @@ const SectionQuiz = () => {
             <div className="success-message">
               <Trophy size={32} />
               <h2>Congratulations!</h2>
-              <p>You've successfully completed this section and earned {xpEarned} XP!</p>
+              <p>
+                You've successfully completed this section and earned {xpEarned} XP
+                {isPerfectScore && bonusXP > 0 && (
+                  <span> ({xpEarned - bonusXP} base + {bonusXP} perfect score bonus)</span>
+                )}
+                !
+              </p>
             </div>
           )}
 

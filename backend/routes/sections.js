@@ -210,7 +210,12 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
 
     // Calculate XP earned (simple formula)
     const percentage = (score / totalQuestions) * 100;
-    const xpEarned = Math.round((percentage / 100) * 50); // Max 50 XP per quiz
+    let xpEarned = Math.round((percentage / 100) * 50); // Max 50 XP per quiz
+    
+    // Bonus XP for perfect score (100%)
+    const isPerfectScore = score === totalQuestions;
+    const bonusXP = isPerfectScore ? 25 : 0; // 25 XP bonus for perfect score
+    xpEarned += bonusXP;
     
     // Store each answer in user_progress table
     for (const [questionIndex, selectedAnswer] of Object.entries(answers)) {
@@ -283,12 +288,20 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
       });
     });
     
+    // Build message with bonus info if applicable
+    let message = `Quiz completed! You earned ${xpEarned} XP.`;
+    if (isPerfectScore && bonusXP > 0) {
+      message = `Quiz completed! You earned ${xpEarned} XP (${xpEarned - bonusXP} base + ${bonusXP} perfect score bonus).`;
+    }
+    
     res.json({ 
       success: true, 
       xpEarned,
+      bonusXP: bonusXP,
+      isPerfectScore: isPerfectScore,
       newTotalXP: userStats.total_xp,
       newLevel: userStats.level,
-      message: `Quiz completed! You earned ${xpEarned} XP.`
+      message: message
     });
   } catch (error) {
     console.error('Database error:', error);
