@@ -4,7 +4,8 @@
  * Railway Deployment Setup Helper
  * 
  * This script helps you prepare your project for Railway deployment
- * Run: node setup-railway-deployment.js
+ * Run from project root: node backend/scripts/setup-railway-deployment.js
+ * Or from backend/scripts: node setup-railway-deployment.js
  */
 
 const fs = require('fs');
@@ -40,8 +41,9 @@ try {
 
 // Step 3: Check Railway configuration
 console.log('\n📋 Step 3: Checking Railway configuration...');
-const nixpacksExists = fs.existsSync(path.join(__dirname, 'backend/nixpacks.toml'));
-const dockerfileExists = fs.existsSync(path.join(__dirname, 'backend/Dockerfile'));
+const rootDir = path.join(__dirname, '..', '..');
+const nixpacksExists = fs.existsSync(path.join(rootDir, 'backend/nixpacks.toml'));
+const dockerfileExists = fs.existsSync(path.join(rootDir, 'backend/Dockerfile'));
 
 if (nixpacksExists) {
   console.log('✅ Found backend/nixpacks.toml');
@@ -55,8 +57,9 @@ if (!nixpacksExists && !dockerfileExists) {
 
 // Step 4: Create frontend .env template
 console.log('\n📋 Step 4: Frontend environment setup...');
-const frontendEnvPath = path.join(__dirname, 'frontend/.env');
-const frontendEnvExample = path.join(__dirname, 'frontend/.env.example');
+const rootDir = path.join(__dirname, '..', '..');
+const frontendEnvPath = path.join(rootDir, 'frontend/.env');
+const frontendEnvExample = path.join(rootDir, 'frontend/.env.example');
 
 if (!fs.existsSync(frontendEnvPath)) {
   const envContent = `# Railway Backend URL
@@ -108,7 +111,8 @@ console.log('\n' + '='.repeat(50));
 console.log('\n📚 For detailed instructions, see: DEPLOY_TO_RAILWAY.md\n');
 
 // Save JWT secret to a temporary file (will be gitignored)
-const jwtSecretPath = path.join(__dirname, '.railway-jwt-secret.txt');
+const rootDir = path.join(__dirname, '..', '..');
+const jwtSecretPath = path.join(rootDir, '.railway-jwt-secret.txt');
 fs.writeFileSync(jwtSecretPath, jwtSecret);
 console.log('💾 JWT Secret saved to .railway-jwt-secret.txt (gitignored)');
 console.log('   ⚠️  Keep this secret secure! Only use in Railway environment variables.\n');

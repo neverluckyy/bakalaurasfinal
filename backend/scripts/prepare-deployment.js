@@ -1,4 +1,6 @@
 // Helper script to prepare deployment
+// Run from project root: node backend/scripts/prepare-deployment.js
+// Or from backend/scripts: node prepare-deployment.js
 // This will:
 // 1. Generate JWT secret
 // 2. Create frontend .env file with backend URL
@@ -36,7 +38,8 @@ async function main() {
   }
   
   // Create frontend .env file
-  const frontendEnvPath = path.join(__dirname, 'frontend', '.env');
+  const rootDir = path.join(__dirname, '..', '..');
+  const frontendEnvPath = path.join(rootDir, 'frontend', '.env');
   const envContent = `REACT_APP_API_URL=${backendUrl}\n`;
   
   fs.writeFileSync(frontendEnvPath, envContent);

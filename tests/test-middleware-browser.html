@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Middleware Production Tests - Browser</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #2196F3;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .credentials {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .credentials input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 250px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.pending { background: #ffc107; color: #000; }
+        .status.running { background: #2196F3; color: #fff; }
+        .status.passed { background: #4CAF50; color: #fff; }
+        .status.failed { background: #f44336; color: #fff; }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Middleware Production Tests - Browser</h1>
+        <p><strong>Backend:</strong> <code>https://bakalaurasfinal-production.up.railway.app</code></p>
+        <p><strong>Frontend:</strong> <code>https://sensebait.pro</code></p>
+
+        <div class="credentials">
+            <h3>Test Credentials (Optional - for authenticated tests)</h3>
+            <input type="email" id="testEmail" placeholder="Email (optional)">
+            <input type="password" id="testPassword" placeholder="Password (optional)">
+            <button onclick="testLogin()">Test Login</button>
+            <div id="loginResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>1. Authentication Middleware Tests</h2>
+            <button onclick="testNoToken()">Test: No Token</button>
+            <button onclick="testInvalidToken()">Test: Invalid Token</button>
+            <button onclick="testMalformedToken()">Test: Malformed Token</button>
+            <div id="authResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Admin Middleware Tests</h2>
+            <button onclick="testAdminNoToken()">Test: Admin Endpoint (No Token)</button>
+            <button onclick="testAdminWithToken()">Test: Admin Endpoint (With Token)</button>
+            <div id="adminResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. User Profile Middleware Tests</h2>
+            <button onclick="testGetUserProfile()">Test: /api/auth/me</button>
+            <div id="profileResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Cookie-Based Authentication</h2>
+            <button onclick="testCookieAuth()">Test: Cookie Token Support</button>
+            <div id="cookieResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Protected Endpoints</h2>
+            <button onclick="testAllProtectedEndpoints()">Test All Protected Endpoints</button>
+            <div id="protectedResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>6. CORS Headers Test</h2>
+            <button onclick="testCORS()">Test CORS Configuration</button>
+            <div id="corsResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>7. Run All Tests</h2>
+            <button onclick="runAllTests()" style="background: #2196F3; font-size: 16px; padding: 15px 30px;">🚀 Run All Tests</button>
+            <div id="allResults"></div>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'https://bakalaurasfinal-production.up.railway.app';
+        const FRONTEND_URL = 'https://sensebait.pro';
+        let authToken = null;
+
+        function addResult(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<pre>${message}</pre>`;
+            container.appendChild(div);
+        }
+
+        function clearResults(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    method: options.method || 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+                        ...options.headers
+                    },
+                    credentials: 'include', // Include cookies
+                    ...options
+                });
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = await response.text();
+                }
+
+                return {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    data: data
+                };
+            } catch (error) {
+                return {
+                    error: error.message
+                };
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            const resultDiv = document.getElementById('loginResult');
+            
+            if (!email || !password) {
+                resultDiv.innerHTML = '<div class="result warning">Please enter email and password</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="result info">Attempting login...</div>';
+
+            try {
+                const response = await makeRequest(`${BACKEND_URL}/api/auth/login`, {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (response.status === 200 && response.data.token) {
+                    authToken = response.data.token;
+                    resultDiv.innerHTML = `<div class="result success">✅ Login successful! Token stored.</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="result error">❌ Login failed: ${JSON.stringify(response.data)}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testNoToken() {
+            clearResults('authResults');
+            addResult('authResults', 'Testing: Request without token...', 'info');
+            
+            const response = await makeRequest(`${BACKEND_URL}/api/user/stats`, {
+                headers: {} // Explicitly no auth header
+            });
+
+            if (response.status === 401) {
+                addResult('authResults', `✅ PASS: Correctly rejected (401)\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'success');
+            } else {
+                addResult('authResults', `❌ FAIL: Expected 401, got ${response.status}\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function testInvalidToken() {
+            clearResults('authResults');
+            addResult('authResults', 'Testing: Request with invalid token...', 'info');
+            
+            const response = await makeRequest(`${BACKEND_URL}/api/user/stats`, {
+                headers: { 'Authorization': 'Bearer invalid_token_12345' }
+            });
+
+            if (response.status === 403) {
+                addResult('authResults', `✅ PASS: Correctly rejected invalid token (403)\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'success');
+            } else {
+                addResult('authResults', `❌ FAIL: Expected 403, got ${response.status}\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function testMalformedToken() {
+            clearResults('authResults');
+            addResult('authResults', 'Testing: Request with malformed token...', 'info');
+            
+            const response = await makeRequest(`${BACKEND_URL}/api/user/stats`, {
+                headers: { 'Authorization': 'Bearer not.a.valid.jwt.token' }
+            });
+
+            if (response.status === 403) {
+                addResult('authResults', `✅ PASS: Correctly rejected malformed token (403)\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'success');
+            } else {
+                addResult('authResults', `❌ FAIL: Expected 403, got ${response.status}\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function testAdminNoToken() {
+            clearResults('adminResults');
+            addResult('adminResults', 'Testing: Admin endpoint without token...', 'info');
+            
+            const response = await makeRequest(`${BACKEND_URL}/api/admin/modules`, {
+                headers: {}
+            });
+
+            if (response.status === 401) {
+                addResult('adminResults', `✅ PASS: Correctly rejected admin request without token (401)\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'success');
+            } else {
+                addResult('adminResults', `❌ FAIL: Expected 401, got ${response.status}\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function testAdminWithToken() {
+            clearResults('adminResults');
+            
+            if (!authToken) {
+                addResult('adminResults', '⚠️  SKIP: No auth token. Please login first.', 'warning');
+                return;
+            }
+
+            addResult('adminResults', 'Testing: Admin endpoint with token...', 'info');
+            
+            const response = await makeRequest(`${BACKEND_URL}/api/admin/modules`);
+
+            if (response.status === 200) {
+                addResult('adminResults', `✅ PASS: Admin access granted (200)\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'success');
+            } else if (response.status === 403) {
+                addResult('adminResults', `✅ PASS: Correctly rejected non-admin user (403)\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'success');
+            } else {
+                addResult('adminResults', `❌ FAIL: Unexpected status ${response.status}\nResponse: ${JSON.stringify(response.data, null, 2)}`, 'error');
+            }
+        }
+
+        async function testGetUserProfile() {
+            clearResults('profileResults');
+            addResult('profileResults', 'Testing: /api/auth/me endpoint...', 'info');
+            
+            // Test without token
+            const responseNoToken = await makeRequest(`${BACKEND_URL}/api/auth/me`, {
+                headers: {}
+            });
+
+            if (responseNoToken.status === 401) {
+                addResult('profileResults', `✅ PASS: Correctly rejected /me without token (401)\nResponse: ${JSON.stringify(responseNoToken.data, null, 2)}`, 'success');
+            } else {
+                addResult('profileResults', `❌ FAIL: Expected 401, got ${responseNoToken.status}`, 'error');
+            }
+
+            // Test with token if available
+            if (authToken) {
+                addResult('profileResults', 'Testing: /api/auth/me with token...', 'info');
+                const responseWithToken = await makeRequest(`${BACKEND_URL}/api/auth/me`);
+                
+                if (responseWithToken.status === 200) {
+                    addResult('profileResults', `✅ PASS: getUserProfile middleware worked (200)\nUser: ${JSON.stringify(responseWithToken.data, null, 2)}`, 'success');
+                } else {
+                    addResult('profileResults', `❌ FAIL: Expected 200, got ${responseWithToken.status}`, 'error');
+                }
+            } else {
+                addResult('profileResults', 'ℹ️  INFO: Login to test authenticated /me endpoint', 'info');
+            }
+        }
+
+        async function testCookieAuth() {
+            clearResults('cookieResults');
+            addResult('cookieResults', 'Testing: Cookie-based authentication...', 'info');
+            
+            // First, try to login which should set a cookie
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+
+            if (!email || !password) {
+                addResult('cookieResults', '⚠️  SKIP: Enter credentials to test cookie auth', 'warning');
+                return;
+            }
+
+            try {
+                // Login request with credentials: 'include' to receive cookies
+                const loginResponse = await fetch(`${BACKEND_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+
+                const loginData = await loginResponse.json();
+
+                if (loginResponse.ok && loginData.token) {
+                    addResult('cookieResults', '✅ Login successful, cookie should be set', 'success');
+                    
+                    // Now test if we can access protected endpoint using only cookies (no Authorization header)
+                    const protectedResponse = await fetch(`${BACKEND_URL}/api/user/stats`, {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: {} // No Authorization header
+                    });
+
+                    const protectedData = await protectedResponse.json();
+
+                    if (protectedResponse.status === 200) {
+                        addResult('cookieResults', `✅ PASS: Cookie-based auth works!\nResponse: ${JSON.stringify(protectedData, null, 2)}`, 'success');
+                    } else if (protectedResponse.status === 401) {
+                        addResult('cookieResults', `⚠️  Cookie auth not working, falling back to header token\nStatus: ${protectedResponse.status}`, 'warning');
+                    } else {
+                        addResult('cookieResults', `❌ Unexpected status: ${protectedResponse.status}\nResponse: ${JSON.stringify(protectedData, null, 2)}`, 'error');
+                    }
+                } else {
+                    addResult('cookieResults', `❌ Login failed: ${JSON.stringify(loginData)}`, 'error');
+                }
+            } catch (error) {
+                addResult('cookieResults', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAllProtectedEndpoints() {
+            clearResults('protectedResults');
+            addResult('protectedResults', 'Testing all protected endpoints...', 'info');
+
+            const endpoints = [
+                '/api/user/stats',
+                '/api/user/achievements',
+                '/api/modules',
+                '/api/leaderboard',
+                '/api/sections/1',
+                '/api/questions/sections/1/next'
+            ];
+
+            let passed = 0;
+            let failed = 0;
+
+            for (const endpoint of endpoints) {
+                const response = await makeRequest(`${BACKEND_URL}${endpoint}`, {
+                    headers: {}
+                });
+
+                if (response.status === 401 || response.status === 403) {
+                    addResult('protectedResults', `✅ ${endpoint} - Protected (${response.status})`, 'success');
+                    passed++;
+                } else {
+                    addResult('protectedResults', `❌ ${endpoint} - Unexpected status: ${response.status}`, 'error');
+                    failed++;
+                }
+            }
+
+            addResult('protectedResults', `\n📊 Results: ${passed} passed, ${failed} failed`, passed > failed ? 'success' : 'error');
+        }
+
+        async function testCORS() {
+            clearResults('corsResults');
+            addResult('corsResults', 'Testing CORS headers...', 'info');
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/health`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': FRONTEND_URL,
+                        'Access-Control-Request-Method': 'GET'
+                    }
+                });
+
+                const corsHeaders = {
+                    'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+                    'access-control-allow-credentials': response.headers.get('access-control-allow-credentials'),
+                    'access-control-allow-methods': response.headers.get('access-control-allow-methods'),
+                    'access-control-allow-headers': response.headers.get('access-control-allow-headers')
+                };
+
+                addResult('corsResults', `CORS Headers:\n${JSON.stringify(corsHeaders, null, 2)}`, 'info');
+
+                if (corsHeaders['access-control-allow-origin']) {
+                    addResult('corsResults', '✅ CORS headers are present', 'success');
+                } else {
+                    addResult('corsResults', '⚠️  CORS headers may be missing', 'warning');
+                }
+            } catch (error) {
+                addResult('corsResults', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function runAllTests() {
+            clearResults('allResults');
+            addResult('allResults', '🚀 Running all tests...', 'info');
+
+            await testNoToken();
+            await new Promise(r => setTimeout(r, 500));
+            await testInvalidToken();
+            await new Promise(r => setTimeout(r, 500));
+            await testMalformedToken();
+            await new Promise(r => setTimeout(r, 500));
+            await testAdminNoToken();
+            await new Promise(r => setTimeout(r, 500));
+            await testGetUserProfile();
+            await new Promise(r => setTimeout(r, 500));
+            await testAllProtectedEndpoints();
+            await new Promise(r => setTimeout(r, 500));
+            await testCORS();
+
+            addResult('allResults', '\n✅ All automated tests completed!', 'success');
+            addResult('allResults', 'ℹ️  For cookie and authenticated tests, please login first.', 'info');
+        }
+    </script>
+</body>
+</html>
+
