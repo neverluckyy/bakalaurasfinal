@@ -133,7 +133,7 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
 
       // Check if there's existing progress for this question
       db.get(
-        'SELECT is_correct FROM user_progress WHERE user_id = ? AND question_id = ?',
+        'SELECT is_correct, xp_awarded FROM user_progress WHERE user_id = ? AND question_id = ?',
         [req.user.id, questionId],
         function(err, existingProgress) {
           if (err) {
@@ -141,77 +141,138 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
             return res.status(500).json({ error: 'Failed to check existing progress' });
           }
 
+          // Calculate XP to award: only if they haven't already earned XP for this question
+          // Prevent XP farming: if they already answered correctly, don't award XP again
+          const alreadyAnsweredCorrectly = existingProgress && existingProgress.is_correct === 1;
+          const alreadyEarnedXP = existingProgress && existingProgress.xp_awarded > 0;
+          const shouldAwardXP = !alreadyAnsweredCorrectly && !alreadyEarnedXP && isCorrect;
+          const actualXPAwarded = shouldAwardXP ? xpAwarded : 0;
+
           // Only update if:
           // 1. No previous answer exists, OR
           // 2. The new answer is correct (preserve correct answers, allow improvement)
           if (!existingProgress || isCorrect) {
             db.run(
               'INSERT OR REPLACE INTO user_progress (user_id, question_id, is_correct, selected_answer, xp_awarded) VALUES (?, ?, ?, ?, ?)',
-              [req.user.id, questionId, isCorrect, selectedAnswer, xpAwarded],
+              [req.user.id, questionId, isCorrect, selectedAnswer, actualXPAwarded],
               function(err) {
                 if (err) {
                   console.error('Database error:', err);
                   return res.status(500).json({ error: 'Failed to save progress' });
                 }
 
-                // Update user's total XP and level
-                db.run(
-                  'UPDATE users SET total_xp = total_xp + ?, level = FLOOR((total_xp + ?) / 100) + 1 WHERE id = ?',
-                  [xpAwarded, xpAwarded, req.user.id],
-                  (err) => {
-                    if (err) {
-                      console.error('Database error:', err);
-                      return res.status(500).json({ error: 'Failed to update user stats' });
-                    }
-
-                    // Get updated user stats
-                    db.get(
-                      'SELECT total_xp, level FROM users WHERE id = ?',
-                      [req.user.id],
-                      (err, userStats) => {
-                        if (err) {
-                          console.error('Database error:', err);
-                          return res.status(500).json({ error: 'Failed to get user stats' });
-                        }
-
-                        // Get section progress
-                        db.get(
-                          `SELECT 
-                            COUNT(*) as total_questions,
-                            SUM(CASE WHEN up.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers
-                          FROM questions q
-                          LEFT JOIN user_progress up ON q.id = up.question_id AND up.user_id = ?
-                          WHERE q.section_id = ?`,
-                          [req.user.id, question.section_id],
-                          (err, sectionProgress) => {
-                            if (err) {
-                              console.error('Database error:', err);
-                              return res.status(500).json({ error: 'Failed to get section progress' });
-                            }
-
-                            const response = {
-                              isCorrect,
-                              correctAnswer: question.correct_answer,
-                              explanation: question.explanation,
-                              xpAwarded,
-                              totalXp: userStats.total_xp,
-                              newLevel: userStats.level,
-                              sectionProgress: {
-                                totalQuestions: sectionProgress.total_questions,
-                                correctAnswers: sectionProgress.correct_answers,
-                                percentage: sectionProgress.total_questions > 0 
-                                  ? Math.round((sectionProgress.correct_answers / sectionProgress.total_questions) * 100)
-                                  : 0
-                              }
-                            };
-
-                            res.json(response);
-                          }
-                        );
+                // Update user's total XP and level (only if XP should be awarded)
+                if (actualXPAwarded > 0) {
+                  db.run(
+                    'UPDATE users SET total_xp = total_xp + ?, level = FLOOR((total_xp + ?) / 100) + 1 WHERE id = ?',
+                    [actualXPAwarded, actualXPAwarded, req.user.id],
+                    (err) => {
+                      if (err) {
+                        console.error('Database error:', err);
+                        return res.status(500).json({ error: 'Failed to update user stats' });
                       }
-                    );
-                  }
-                );
+
+                      // Get updated user stats
+                      db.get(
+                        'SELECT total_xp, level FROM users WHERE id = ?',
+                        [req.user.id],
+                        (err, userStats) => {
+                          if (err) {
+                            console.error('Database error:', err);
+                            return res.status(500).json({ error: 'Failed to get user stats' });
+                          }
+
+                          // Get section progress
+                          db.get(
+                            `SELECT 
+                              COUNT(*) as total_questions,
+                              SUM(CASE WHEN up.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers
+                            FROM questions q
+                            LEFT JOIN user_progress up ON q.id = up.question_id AND up.user_id = ?
+                            WHERE q.section_id = ?`,
+                            [req.user.id, question.section_id],
+                            (err, sectionProgress) => {
+                              if (err) {
+                                console.error('Database error:', err);
+                                return res.status(500).json({ error: 'Failed to get section progress' });
+                              }
+
+                              const response = {
+                                isCorrect,
+                                correctAnswer: question.correct_answer,
+                                explanation: question.explanation,
+                                xpAwarded: actualXPAwarded,
+                                totalXp: userStats.total_xp,
+                                newLevel: userStats.level,
+                                sectionProgress: {
+                                  totalQuestions: sectionProgress.total_questions,
+                                  correctAnswers: sectionProgress.correct_answers,
+                                  percentage: sectionProgress.total_questions > 0 
+                                    ? Math.round((sectionProgress.correct_answers / sectionProgress.total_questions) * 100)
+                                    : 0
+                                }
+                              };
+
+                              res.json(response);
+                            }
+                          );
+                        }
+                      );
+                    }
+                  );
+                } else {
+                  // No XP to add, just return the existing stats without updating XP
+                  db.get(
+                    'SELECT total_xp, level FROM users WHERE id = ?',
+                    [req.user.id],
+                    (err, userStats) => {
+                      if (err) {
+                        console.error('Database error:', err);
+                        return res.status(500).json({ error: 'Failed to get user stats' });
+                      }
+
+                      db.get(
+                        `SELECT 
+                          COUNT(*) as total_questions,
+                          SUM(CASE WHEN up.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers
+                        FROM questions q
+                        LEFT JOIN user_progress up ON q.id = up.question_id AND up.user_id = ?
+                        WHERE q.section_id = ?`,
+                        [req.user.id, question.section_id],
+                        (err, sectionProgress) => {
+                          if (err) {
+                            console.error('Database error:', err);
+                            return res.status(500).json({ error: 'Failed to get section progress' });
+                          }
+
+                          const response = {
+                            isCorrect,
+                            correctAnswer: question.correct_answer,
+                            explanation: question.explanation,
+                            xpAwarded: 0,
+                            totalXp: userStats.total_xp,
+                            newLevel: userStats.level,
+                            sectionProgress: {
+                              totalQuestions: sectionProgress.total_questions,
+                              correctAnswers: sectionProgress.correct_answers,
+                              percentage: sectionProgress.total_questions > 0 
+                                ? Math.round((sectionProgress.correct_answers / sectionProgress.total_questions) * 100)
+                                : 0
+                            }
+                          };
+
+                          if (alreadyAnsweredCorrectly || alreadyEarnedXP) {
+                            response.message = 'XP already awarded for this question';
+                          }
+
+                          res.json(response);
+                        }
+                      );
+                    }
+                  );
+                }
+              }
+            );
               }
             );
           } else {
