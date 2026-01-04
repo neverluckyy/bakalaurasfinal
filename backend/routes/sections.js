@@ -208,32 +208,38 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
       });
     });
 
-    // Calculate XP earned (simple formula)
-    const percentage = (score / totalQuestions) * 100;
-    let xpEarned = Math.round((percentage / 100) * 50); // Max 50 XP per quiz
+    // Track newly correct answers for XP calculation
+    let newCorrectAnswers = 0;
+    let allCorrectAnswers = 0;
     
-    // Bonus XP for perfect score (100%)
-    const isPerfectScore = score === totalQuestions;
-    const bonusXP = isPerfectScore ? 25 : 0; // 25 XP bonus for perfect score
-    xpEarned += bonusXP;
-    
-    // Store each answer in user_progress table
+    // Store each answer in user_progress table and track newly correct answers
     for (const [questionIndex, selectedAnswer] of Object.entries(answers)) {
       const questionId = questions[parseInt(questionIndex)].id;
       const correctAnswer = questions[parseInt(questionIndex)].correct_answer;
       const isCorrect = selectedAnswer === correctAnswer;
-      const questionXP = isCorrect ? 10 : 0; // 10 XP per correct answer
+      if (isCorrect) allCorrectAnswers++;
 
       await new Promise((resolve, reject) => {
         // First check if there's existing progress for this question
         db.get(
-          'SELECT is_correct FROM user_progress WHERE user_id = ? AND question_id = ?',
+          'SELECT is_correct, xp_awarded FROM user_progress WHERE user_id = ? AND question_id = ?',
           [userId, questionId],
           function(err, existingProgress) {
             if (err) {
               reject(err);
               return;
             }
+
+            // Check if this is a newly correct answer (prevent XP farming)
+            const alreadyAnsweredCorrectly = existingProgress && existingProgress.is_correct === 1;
+            const alreadyEarnedXP = existingProgress && existingProgress.xp_awarded > 0;
+            const isNewlyCorrect = isCorrect && !alreadyAnsweredCorrectly && !alreadyEarnedXP;
+            
+            if (isNewlyCorrect) {
+              newCorrectAnswers++;
+            }
+
+            const questionXP = isNewlyCorrect ? 10 : 0; // Only award XP for newly correct answers
 
             // Only update if:
             // 1. No previous answer exists, OR
@@ -255,6 +261,16 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
         );
       });
     }
+    
+    // Calculate XP earned based on newly correct answers only (prevent XP farming)
+    const newPercentage = totalQuestions > 0 ? (newCorrectAnswers / totalQuestions) * 100 : 0;
+    let xpEarned = Math.round((newPercentage / 100) * 50); // Max 50 XP per quiz, based on new answers only
+    
+    // Bonus XP for perfect score (100%) - only if all answers are newly correct
+    const isPerfectScore = allCorrectAnswers === totalQuestions;
+    const allNewlyCorrect = newCorrectAnswers === totalQuestions;
+    const bonusXP = (isPerfectScore && allNewlyCorrect) ? 25 : 0; // 25 XP bonus only for first-time perfect score
+    xpEarned += bonusXP;
     
     // Clear draft state after successful submission
     await new Promise((resolve, reject) => {
@@ -290,8 +306,10 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
     
     // Build message with bonus info if applicable
     let message = `Quiz completed! You earned ${xpEarned} XP.`;
-    if (isPerfectScore && bonusXP > 0) {
+    if (isPerfectScore && bonusXP > 0 && allNewlyCorrect) {
       message = `Quiz completed! You earned ${xpEarned} XP (${xpEarned - bonusXP} base + ${bonusXP} perfect score bonus).`;
+    } else if (newCorrectAnswers === 0 && allCorrectAnswers > 0) {
+      message = `Quiz completed! You scored ${allCorrectAnswers}/${totalQuestions}, but you already earned XP for these questions. No additional XP awarded.`;
     }
     
     res.json({ 
