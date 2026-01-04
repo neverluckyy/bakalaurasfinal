@@ -273,8 +273,6 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
                 }
               }
             );
-              }
-            );
           } else {
             // Don't update if we already have a correct answer and the new one is wrong
             // Just return the existing result without updating
