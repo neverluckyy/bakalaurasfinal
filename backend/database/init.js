@@ -173,7 +173,8 @@ function initDatabase() {
           )
         `);
 
-        // User progress table
+        // User progress table - allows multiple attempts per question (one-to-many relationship)
+        // This enables tracking history of every question attempted and prevents XP farming
         db.run(`
           CREATE TABLE IF NOT EXISTS user_progress (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,10 +185,80 @@ function initDatabase() {
             xp_awarded INTEGER DEFAULT 0,
             answered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (question_id) REFERENCES questions (id),
-            UNIQUE(user_id, question_id)
+            FOREIGN KEY (question_id) REFERENCES questions (id)
           )
         `);
+        
+        // Create index for performance (instead of UNIQUE constraint)
+        db.run(`
+          CREATE INDEX IF NOT EXISTS idx_user_progress_user_question 
+          ON user_progress(user_id, question_id)
+        `, (err) => {
+          if (err && !err.message.includes('already exists')) {
+            console.warn('Warning: Could not create index on user_progress:', err.message);
+          }
+        });
+        
+        // Migration: Remove UNIQUE constraint if it exists (for existing databases)
+        // SQLite doesn't support DROP CONSTRAINT, so we check if we need to recreate the table
+        db.get(`
+          SELECT sql FROM sqlite_master 
+          WHERE type='table' AND name='user_progress' AND sql LIKE '%UNIQUE(user_id, question_id)%'
+        `, (err, row) => {
+          if (!err && row) {
+            // UNIQUE constraint exists, need to migrate
+            console.log('Migrating user_progress table to remove UNIQUE constraint...');
+            db.serialize(() => {
+              // Create new table without UNIQUE constraint
+              db.run(`
+                CREATE TABLE IF NOT EXISTS user_progress_new (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER NOT NULL,
+                  question_id INTEGER NOT NULL,
+                  is_correct BOOLEAN NOT NULL,
+                  selected_answer TEXT,
+                  xp_awarded INTEGER DEFAULT 0,
+                  answered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY (user_id) REFERENCES users (id),
+                  FOREIGN KEY (question_id) REFERENCES questions (id)
+                )
+              `, (err) => {
+                if (err) {
+                  console.warn('Warning: Could not create new user_progress table:', err.message);
+                  return;
+                }
+                
+                // Copy all data from old table to new
+                db.run(`
+                  INSERT INTO user_progress_new 
+                  SELECT * FROM user_progress
+                `, (err) => {
+                  if (err) {
+                    console.warn('Warning: Could not copy data to new user_progress table:', err.message);
+                    return;
+                  }
+                  
+                  // Drop old table
+                  db.run(`DROP TABLE user_progress`, (err) => {
+                    if (err) {
+                      console.warn('Warning: Could not drop old user_progress table:', err.message);
+                      return;
+                    }
+                    
+                    // Rename new table
+                    db.run(`ALTER TABLE user_progress_new RENAME TO user_progress`, (err) => {
+                      if (err) {
+                        console.warn('Warning: Could not rename new user_progress table:', err.message);
+                      } else {
+                        console.log('✓ Successfully migrated user_progress table');
+                      }
+                    });
+                  });
+                });
+              });
+            });
+          }
+        });
 
         // User learning progress table
         db.run(`

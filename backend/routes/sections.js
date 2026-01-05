@@ -220,20 +220,21 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
       if (isCorrect) allCorrectAnswers++;
 
       await new Promise((resolve, reject) => {
-        // First check if there's existing progress for this question
+        // Check if XP was already awarded in any previous attempt (prevent XP farming)
+        // Track history of every question attempted by checking SUM of xp_awarded
         db.get(
-          'SELECT is_correct, xp_awarded FROM user_progress WHERE user_id = ? AND question_id = ?',
+          'SELECT SUM(xp_awarded) as total_xp_awarded FROM user_progress WHERE user_id = ? AND question_id = ?',
           [userId, questionId],
-          function(err, existingProgress) {
+          function(err, progressSummary) {
             if (err) {
               reject(err);
               return;
             }
 
             // Check if this is a newly correct answer (prevent XP farming)
-            const alreadyAnsweredCorrectly = existingProgress && existingProgress.is_correct === 1;
-            const alreadyEarnedXP = existingProgress && existingProgress.xp_awarded > 0;
-            const isNewlyCorrect = isCorrect && !alreadyAnsweredCorrectly && !alreadyEarnedXP;
+            // Only count as new if no XP was awarded in any previous attempt
+            const totalXPAwarded = progressSummary?.total_xp_awarded || 0;
+            const isNewlyCorrect = isCorrect && totalXPAwarded === 0;
             
             if (isNewlyCorrect) {
               newCorrectAnswers++;
@@ -241,22 +242,16 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
 
             const questionXP = isNewlyCorrect ? 10 : 0; // Only award XP for newly correct answers
 
-            // Only update if:
-            // 1. No previous answer exists, OR
-            // 2. The new answer is correct (preserve correct answers, allow improvement)
-            if (!existingProgress || isCorrect) {
-              db.run(
-                'INSERT OR REPLACE INTO user_progress (user_id, question_id, is_correct, selected_answer, xp_awarded) VALUES (?, ?, ?, ?, ?)',
-                [userId, questionId, isCorrect, selectedAnswer, questionXP],
-                function(err) {
-                  if (err) reject(err);
-                  else resolve();
-                }
-              );
-            } else {
-              // Don't update if we already have a correct answer and the new one is wrong
-              resolve();
-            }
+            // Always INSERT a new attempt to track history (one-to-many relationship)
+            // This records every question attempt, not just the latest
+            db.run(
+              'INSERT INTO user_progress (user_id, question_id, is_correct, selected_answer, xp_awarded) VALUES (?, ?, ?, ?, ?)',
+              [userId, questionId, isCorrect, selectedAnswer, questionXP],
+              function(err) {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
           }
         );
       });

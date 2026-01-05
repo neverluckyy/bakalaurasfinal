@@ -131,31 +131,29 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
       const isCorrect = selectedAnswer === question.correct_answer;
       const xpAwarded = isCorrect ? 10 : 0;
 
-      // Check if there's existing progress for this question
+      // Check if XP was already awarded in any previous attempt (prevent XP farming)
+      // Track history of every question attempted by checking SUM of xp_awarded
       db.get(
-        'SELECT is_correct, xp_awarded FROM user_progress WHERE user_id = ? AND question_id = ?',
+        'SELECT SUM(xp_awarded) as total_xp_awarded FROM user_progress WHERE user_id = ? AND question_id = ?',
         [req.user.id, questionId],
-        function(err, existingProgress) {
+        function(err, progressSummary) {
           if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to check existing progress' });
           }
 
-          // Calculate XP to award: only if they haven't already earned XP for this question
-          // Prevent XP farming: if they already answered correctly, don't award XP again
-          const alreadyAnsweredCorrectly = existingProgress && existingProgress.is_correct === 1;
-          const alreadyEarnedXP = existingProgress && existingProgress.xp_awarded > 0;
-          const shouldAwardXP = !alreadyAnsweredCorrectly && !alreadyEarnedXP && isCorrect;
+          // Calculate XP to award: only if no XP was awarded in any previous attempt
+          // This prevents XP farming by checking the history of all attempts
+          const totalXPAwarded = progressSummary?.total_xp_awarded || 0;
+          const shouldAwardXP = totalXPAwarded === 0 && isCorrect;
           const actualXPAwarded = shouldAwardXP ? xpAwarded : 0;
 
-          // Only update if:
-          // 1. No previous answer exists, OR
-          // 2. The new answer is correct (preserve correct answers, allow improvement)
-          if (!existingProgress || isCorrect) {
-            db.run(
-              'INSERT OR REPLACE INTO user_progress (user_id, question_id, is_correct, selected_answer, xp_awarded) VALUES (?, ?, ?, ?, ?)',
-              [req.user.id, questionId, isCorrect, selectedAnswer, actualXPAwarded],
-              function(err) {
+          // Always INSERT a new attempt to track history (one-to-many relationship)
+          // This records every question attempt, not just the latest
+          db.run(
+            'INSERT INTO user_progress (user_id, question_id, is_correct, selected_answer, xp_awarded) VALUES (?, ?, ?, ?, ?)',
+            [req.user.id, questionId, isCorrect, selectedAnswer, actualXPAwarded],
+            function(err) {
                 if (err) {
                   console.error('Database error:', err);
                   return res.status(500).json({ error: 'Failed to save progress' });
@@ -182,11 +180,11 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
                             return res.status(500).json({ error: 'Failed to get user stats' });
                           }
 
-                          // Get section progress
+                          // Get section progress (handle multiple attempts per question)
                           db.get(
                             `SELECT 
-                              COUNT(*) as total_questions,
-                              SUM(CASE WHEN up.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers
+                              COUNT(DISTINCT q.id) as total_questions,
+                              COUNT(DISTINCT CASE WHEN up.is_correct = 1 THEN q.id END) as correct_answers
                             FROM questions q
                             LEFT JOIN user_progress up ON q.id = up.question_id AND up.user_id = ?
                             WHERE q.section_id = ?`,
@@ -233,8 +231,8 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
 
                       db.get(
                         `SELECT 
-                          COUNT(*) as total_questions,
-                          SUM(CASE WHEN up.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers
+                          COUNT(DISTINCT q.id) as total_questions,
+                          COUNT(DISTINCT CASE WHEN up.is_correct = 1 THEN q.id END) as correct_answers
                         FROM questions q
                         LEFT JOIN user_progress up ON q.id = up.question_id AND up.user_id = ?
                         WHERE q.section_id = ?`,
@@ -261,8 +259,8 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
                             }
                           };
 
-                          if (alreadyAnsweredCorrectly || alreadyEarnedXP) {
-                            response.message = 'XP already awarded for this question';
+                          if (totalXPAwarded > 0) {
+                            response.message = 'XP already awarded for this question in a previous attempt';
                           }
 
                           res.json(response);
@@ -273,17 +271,6 @@ router.post('/:questionId/answer', authenticateToken, async (req, res) => {
                 }
               }
             );
-          } else {
-            // Don't update if we already have a correct answer and the new one is wrong
-            // Just return the existing result without updating
-            res.json({
-              isCorrect: existingProgress.is_correct,
-              correctAnswer: question.correct_answer,
-              explanation: question.explanation,
-              xpAwarded: 0, // No XP awarded for not updating
-              message: 'Answer not updated - you already have a correct answer for this question'
-            });
-          }
         }
       );
     }
