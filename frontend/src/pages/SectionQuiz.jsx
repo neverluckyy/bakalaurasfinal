@@ -21,6 +21,7 @@ const SectionQuiz = () => {
   const [xpEarned, setXpEarned] = useState(0);
   const [bonusXP, setBonusXP] = useState(0);
   const [isPerfectScore, setIsPerfectScore] = useState(false);
+  const [xpMessage, setXpMessage] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [moduleId, setModuleId] = useState(null);
@@ -362,19 +363,10 @@ const SectionQuiz = () => {
       // Save draft state with new current question
       saveDraftState(nextQuestion, answers);
     } else {
-      // Quiz completed
+      // Quiz completed - don't calculate XP locally, wait for backend response
       const finalScore = score; // Score is already updated in handleSubmitAnswer
-      const percentage = (finalScore / questions.length) * 100;
-      let earnedXP = Math.round((percentage / 100) * 50); // Max 50 XP per quiz
       
-      // Bonus XP for perfect score (100%)
-      const isPerfect = finalScore === questions.length;
-      const bonus = isPerfect ? 25 : 0; // 25 XP bonus for perfect score
-      earnedXP += bonus;
-      
-      setXpEarned(earnedXP);
-      setBonusXP(bonus);
-      setIsPerfectScore(isPerfect);
+      // Set quiz as completed, but XP will be updated from backend response
       setQuizCompleted(true);
 
       // Submit quiz results
@@ -403,17 +395,24 @@ const SectionQuiz = () => {
           console.error('Error clearing draft state from server:', draftErr);
         }
 
-        // Update user XP - use backend's calculated value (includes bonus)
-        if (response.data.xpEarned) {
-          // Update displayed XP with backend's value (which includes bonus)
-          setXpEarned(response.data.xpEarned);
-          if (response.data.bonusXP !== undefined) {
-            setBonusXP(response.data.bonusXP);
-          }
-          if (response.data.isPerfectScore !== undefined) {
-            setIsPerfectScore(response.data.isPerfectScore);
-          }
-          
+        // Always update XP from backend response (even if 0)
+        // Backend calculates XP based on newly correct answers only
+        setXpEarned(response.data.xpEarned || 0);
+        
+        if (response.data.bonusXP !== undefined) {
+          setBonusXP(response.data.bonusXP);
+        }
+        if (response.data.isPerfectScore !== undefined) {
+          setIsPerfectScore(response.data.isPerfectScore);
+        }
+        
+        // Store the backend message for display
+        if (response.data.message) {
+          setXpMessage(response.data.message);
+        }
+        
+        // Update user stats only if XP was actually awarded
+        if (response.data.xpEarned > 0) {
           // Fetch updated user stats to ensure we have the latest data
           try {
             await axios.get('/api/user/stats');
@@ -453,6 +452,7 @@ const SectionQuiz = () => {
     setXpEarned(0);
     setBonusXP(0);
     setIsPerfectScore(false);
+    setXpMessage(null);
     setShowExplanation(false);
     setAnswerSubmitted(false);
     
@@ -591,11 +591,19 @@ const SectionQuiz = () => {
               <Trophy size={32} />
               <h2>Congratulations!</h2>
               <p>
-                You've successfully completed this section and earned {xpEarned} XP
-                {isPerfectScore && bonusXP > 0 && (
-                  <span> ({xpEarned - bonusXP} base + {bonusXP} perfect score bonus)</span>
+                {xpMessage || (
+                  xpEarned > 0 ? (
+                    <>
+                      You've successfully completed this section and earned {xpEarned} XP
+                      {isPerfectScore && bonusXP > 0 && (
+                        <span> ({xpEarned - bonusXP} base + {bonusXP} perfect score bonus)</span>
+                      )}
+                      !
+                    </>
+                  ) : (
+                    "You've successfully completed this section!"
+                  )
                 )}
-                !
               </p>
             </div>
           )}

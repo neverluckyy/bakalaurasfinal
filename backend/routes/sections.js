@@ -300,11 +300,19 @@ router.post('/:sectionId/quiz', authenticateToken, async (req, res) => {
     });
     
     // Build message with bonus info if applicable
-    let message = `Quiz completed! You earned ${xpEarned} XP.`;
-    if (isPerfectScore && bonusXP > 0 && allNewlyCorrect) {
-      message = `Quiz completed! You earned ${xpEarned} XP (${xpEarned - bonusXP} base + ${bonusXP} perfect score bonus).`;
+    let message = '';
+    if (xpEarned > 0) {
+      if (isPerfectScore && bonusXP > 0 && allNewlyCorrect) {
+        message = `Quiz completed! You earned ${xpEarned} XP (${xpEarned - bonusXP} base + ${bonusXP} perfect score bonus).`;
+      } else {
+        message = `Quiz completed! You earned ${xpEarned} XP.`;
+      }
     } else if (newCorrectAnswers === 0 && allCorrectAnswers > 0) {
-      message = `Quiz completed! You scored ${allCorrectAnswers}/${totalQuestions}, but you already earned XP for these questions. No additional XP awarded.`;
+      message = `Quiz completed! You scored ${allCorrectAnswers}/${totalQuestions}, but you already earned XP for these questions in previous attempts. No additional XP awarded.`;
+    } else if (allCorrectAnswers === 0) {
+      message = `Quiz completed! You scored ${allCorrectAnswers}/${totalQuestions}. Keep practicing to earn XP!`;
+    } else {
+      message = `Quiz completed! You scored ${allCorrectAnswers}/${totalQuestions}.`;
     }
     
     res.json({ 
