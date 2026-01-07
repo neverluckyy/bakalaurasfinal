@@ -215,6 +215,17 @@
   line-height: 1.5;
 }
 
+/* Make text readable on light backgrounds for correct/incorrect answers */
+.answer-option.correct .option-text {
+  color: #065f46; /* Dark green text on light green background */
+  font-weight: 600;
+}
+
+.answer-option.incorrect .option-text {
+  color: #991b1b; /* Dark red text on light red background */
+  font-weight: 600;
+}
+
 .correct-icon {
   color: #10b981;
   margin-left: auto;
